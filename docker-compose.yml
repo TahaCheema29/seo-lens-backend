@@ -1,0 +1,9 @@
+services:
+  seo-lens:
+    build: 
+      context: .
+      dockerfile: DockerFile
+    container_name: seo-lens
+    volumes:
+      - .:/app
+    tty: true

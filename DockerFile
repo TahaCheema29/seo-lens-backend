@@ -1,0 +1,14 @@
+FROM mcr.microsoft.com/playwright/python:v1.50.0-noble
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy your app code
+COPY . .
+
+# Default command
+CMD ["python", "scrapper.py"]
