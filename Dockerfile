@@ -7,8 +7,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install the browsers & system dependencies
+RUN playwright install --with-deps
+
 # Copy your app code
 COPY . .
 
 # Default command
-CMD ["python", "scrapper.py"]
+CMD ["python", "crawler.py"]

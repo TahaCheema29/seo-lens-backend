@@ -89,10 +89,10 @@ async def worker(browser, start_url, worker_id):
 async def main():
     global queue, lock
 
-    # start_url = "https://verdant-soft.com/"
+    start_url = "https://verdant-soft.com/"
     # start_url = "https://quotes.toscrape.com/"
     # start_url = "https://www.cachelogic.tech/"
-    start_url = "https://cookieandkate.com/"
+    # start_url = "https://cookieandkate.com/"
     # start_url = "https://ahrefs.com/"
 
     queue = asyncio.Queue(maxsize=1000)

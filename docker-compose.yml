@@ -2,7 +2,7 @@ services:
   seo-lens:
     build: 
       context: .
-      dockerfile: DockerFile
+      dockerfile: Dockerfile
     container_name: seo-lens
     volumes:
       - .:/app
