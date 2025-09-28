@@ -1,9 +1,7 @@
-### Project setup guide
+### Docker commands for setup
 
 ```
 
-python3.12 -m venv venv
-source venv/bin/activate
 docker compose build
 docker compose up
 
