@@ -1,2 +1,4 @@
 app.log
 *__pycache__
+#output file
+seo_results.csv
