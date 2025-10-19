@@ -7,3 +7,23 @@ services:
     volumes:
       - .:/app
     tty: true
+  
+  keyword-rank-checker:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: keyword-rank-checker
+    volumes:
+      - .:/app
+    command: python keyword_rank_checker.py
+    tty: true
+  
+  keyword-research:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: keyword-research
+    volumes:
+      - .:/app
+    command: python keyword_research.py
+    tty: true

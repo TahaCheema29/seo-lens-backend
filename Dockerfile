@@ -14,4 +14,4 @@ RUN playwright install --with-deps
 COPY . .
 
 # Default command
-CMD ["python", "crawler.py"]
+CMD ["python", "crawler.py", "keyword_rank_checker.py", "seo_analyzer.py", "keyword_research.py"]
