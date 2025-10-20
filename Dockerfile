@@ -14,4 +14,4 @@ RUN playwright install --with-deps
 COPY . .
 
 # Default command
-CMD ["python", "crawler.py"]
+CMD ["python", "main.py"]
