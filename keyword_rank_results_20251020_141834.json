@@ -1,0 +1,142 @@
+[
+  {
+    "keyword": "git tutorial",
+    "target_domain": "w3schools.com",
+    "target_position": 2,
+    "total_results": 10,
+    "search_results": [
+      {
+        "position": 1,
+        "title": "gittutorial Documentation - Git",
+        "url": "https://git-scm.com/docs/gittutorial",
+        "snippet": "This tutorial explains how to import a new project into Git, make changes to it, and share changes with other developers."
+      },
+      {
+        "position": 2,
+        "title": "Git Tutorial",
+        "url": "https://www.w3schools.com/git/",
+        "snippet": "In this tutorial, you'll learn how to use Git for your own projects and how to connect with remote repositories online."
+      },
+      {
+        "position": 3,
+        "title": "Re-wrote my Zero to Hero Git Tutorial and was Told to Post Here ...",
+        "url": "https://www.reddit.com/r/learnprogramming/comments/14i14jv/rewrote_my_zero_to_hero_git_tutorial_and_was_told/",
+        "snippet": "Jun 24, 2023 ... I've rewritten the git tutorial. I've used over the years whenever newbies at work and friends come to me with complex questions but lack the git basics to ..."
+      },
+      {
+        "position": 4,
+        "title": "Git Tutorials and Training | Atlassian Git Tutorial",
+        "url": "https://www.atlassian.com/git/tutorials",
+        "snippet": "Git cheat sheet ... Getting started ... Setting up a repository ... Saving changes ... Inspecting a repository ... Undoing changes ... Rewriting history ... Collaborating."
+      },
+      {
+        "position": 5,
+        "title": "Best git tutorial for beginners : r/git",
+        "url": "https://www.reddit.com/r/git/comments/t7e9u5/best_git_tutorial_for_beginners/",
+        "snippet": "Mar 5, 2022 ... At least chapters 1, 2, 3, 5, 6, 7 of the Git book hosted on the official website. [deleted]. • 4y ago."
+      },
+      {
+        "position": 6,
+        "title": "Learn Git Branching",
+        "url": "https://learngitbranching.js.org/?locale=en_US",
+        "snippet": "Welcome to Learn Git Branching. Interested in learning Git? Well you've come to the right place! \"Learn Git Branching\" is the most visual and interactive ..."
+      },
+      {
+        "position": 7,
+        "title": "An Intro to Git and GitHub for Beginners (Tutorial)",
+        "url": "https://product.hubspot.com/blog/git-and-github-tutorial-for-beginners",
+        "snippet": "Follow the steps below to get comfortable making changes to the code base, opening up a pull request (PR), and merging code into the primary branch."
+      },
+      {
+        "position": 8,
+        "title": "How to Use Git? Tutorials, Workflows & Commands | Atlassian",
+        "url": "https://www.atlassian.com/git",
+        "snippet": "Learn Git with tutorials, news, and tips. Overview Git basics Git is a free and open-source version control system, originally created by Linus Torvalds in ..."
+      },
+      {
+        "position": 9,
+        "title": "Git Tutorial",
+        "url": "https://www.tutorialspoint.com/git/index.htm",
+        "snippet": "This tutorial gives a complete understanding of Git, starting from basic concepts to advanced concepts."
+      },
+      {
+        "position": 10,
+        "title": "Introduction - Steve's Jujutsu Tutorial",
+        "url": "https://steveklabnik.github.io/jujutsu-tutorial/",
+        "snippet": "I opened up the official jj tutorial, installed jj , made this repository on GitHub, followed the \"cloning a git repo\" instructions to pull it down, and started ..."
+      }
+    ],
+    "timestamp": 1760969908.6936324,
+    "date": "2025-10-20 14:18:28"
+  },
+  {
+    "keyword": "version control",
+    "target_domain": "w3schools.com",
+    "target_position": null,
+    "total_results": 10,
+    "search_results": [
+      {
+        "position": 1,
+        "title": "Version control - Wikipedia",
+        "url": "https://en.wikipedia.org/wiki/Version_control",
+        "snippet": "Version control (also known as revision control, source control, and source code management) is the software engineering practice of controlling, organizing, ..."
+      },
+      {
+        "position": 2,
+        "title": "What is version control | Atlassian Git Tutorial",
+        "url": "https://www.atlassian.com/git/tutorials/what-is-version-control",
+        "snippet": "Version control is the practice of tracking and managing changes to software code. Learn about the benefits of version control systems here."
+      },
+      {
+        "position": 3,
+        "title": "About Version Control - Git",
+        "url": "https://git-scm.com/book/ms/v2/Getting-Started-About-Version-Control",
+        "snippet": "Version control is a system that records changes to a file or set of files over time so that you can recall specific versions later."
+      },
+      {
+        "position": 4,
+        "title": "What is version control?",
+        "url": "https://about.gitlab.com/topics/version-control/",
+        "snippet": "Version control - also known as source control or revision control - is an important software development practice for tracking and managing changes made to ..."
+      },
+      {
+        "position": 5,
+        "title": "What is version control? - Azure DevOps | Microsoft Learn",
+        "url": "https://learn.microsoft.com/en-us/devops/develop/git/what-is-version-control",
+        "snippet": "Nov 28, 2022 ... Version control systems are software that help track changes made in code over time and create snapshots of code that a team can roll back ..."
+      },
+      {
+        "position": 6,
+        "title": "Would someone be able to explain Git version control and how it ...",
+        "url": "https://www.reddit.com/r/godot/comments/1bdhiab/would_someone_be_able_to_explain_git_version/",
+        "snippet": "Mar 13, 2024 ... Using video game analogies, Git allows you to make multiple save files of your project. This way you can easily reverse chunks of changes to the ..."
+      },
+      {
+        "position": 7,
+        "title": "Version Control Systems - GeeksforGeeks",
+        "url": "https://www.geeksforgeeks.org/git/version-control-systems/",
+        "snippet": "Sep 24, 2025 ... A Local Version Control System operates entirely on your personal machine without any connection to a remote repository."
+      },
+      {
+        "position": 8,
+        "title": "Splice is not a Version Control, so is there any service you would ...",
+        "url": "https://www.reddit.com/r/ableton/comments/o6ji2s/splice_is_not_a_version_control_so_is_there_any/",
+        "snippet": "Jun 23, 2021 ... If you are searching for Version Control in Git you should check out Motio (https://motio.com) We have a host of version control software that ..."
+      },
+      {
+        "position": 9,
+        "title": "Distributed Version Control is here to stay, baby – Joel on Software",
+        "url": "https://www.joelonsoftware.com/2010/03/17/distributed-version-control-is-here-to-stay-baby/",
+        "snippet": "Mar 17, 2010 ... With distributed version control, merges are easy and work fine. So you can actually have a stable branch and a development branch, or create ..."
+      },
+      {
+        "position": 10,
+        "title": "svn - Do I really need version control? - Stack Overflow",
+        "url": "https://stackoverflow.com/questions/250984/do-i-really-need-version-control",
+        "snippet": "Oct 30, 2008 ... I read all over the Internet (various sites and blogs) about version control. How great it is and how all developers NEED to use it because it is very useful."
+      }
+    ],
+    "timestamp": 1760969912.1665561,
+    "date": "2025-10-20 14:18:32"
+  }
+]

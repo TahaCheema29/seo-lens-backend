@@ -1,12 +1,14 @@
 import asyncio
 import time
 import json
+import requests
 from typing import List, Dict, Optional, Set
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from logger_config import setup_logger
 from urllib.parse import quote_plus
 import re
+from config import GOOGLE_API_KEY, GOOGLE_CSE_ID
 
 logger = setup_logger(__name__)
 
@@ -14,6 +16,97 @@ class KeywordResearch:
     def __init__(self, headless: bool = True):
         self.headless = headless
         self.results = []
+    
+    async def search_google_cse(self, keyword: str, max_results: int = 10) -> List[Dict]:
+        """Search using Google Custom Search Engine API - most reliable method"""
+        try:
+            # Google Custom Search API endpoint
+            api_url = "https://www.googleapis.com/customsearch/v1"
+            
+            params = {
+                'key': GOOGLE_API_KEY,
+                'cx': GOOGLE_CSE_ID,
+                'q': keyword,
+                'num': min(max_results, 10),  # Google CSE API limits to 10 results per request
+                'safe': 'off',
+                'fields': 'items(title,link,snippet)'
+            }
+            
+            logger.info(f"Searching Google CSE API for: {keyword}")
+            response = requests.get(api_url, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                results = []
+                
+                if 'items' in data:
+                    for idx, item in enumerate(data['items'], 1):
+                        try:
+                            results.append({
+                                'position': idx,
+                                'title': item.get('title', 'No title'),
+                                'url': item.get('link', 'No URL'),
+                                'snippet': item.get('snippet', 'No snippet')
+                            })
+                        except Exception as e:
+                            logger.warning(f"Error parsing CSE result {idx}: {e}")
+                            continue
+                
+                logger.info(f"Google CSE API found {len(results)} results")
+                return results
+            else:
+                logger.error(f"Google CSE API request failed with status {response.status_code}: {response.text}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Google CSE API search failed for '{keyword}': {e}")
+            return []
+    
+    async def search_startpage(self, keyword: str, max_results: int = 10) -> List[Dict]:
+        """Fallback search using Startpage"""
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                
+                try:
+                    search_url = f"https://www.startpage.com/sp/search?query={quote_plus(keyword)}"
+                    await page.goto(search_url, timeout=30000)
+                    await page.wait_for_load_state("domcontentloaded")
+                    await page.wait_for_timeout(2000)
+                    
+                    html = await page.content()
+                    soup = BeautifulSoup(html, 'html.parser')
+                    
+                    results = []
+                    search_results = soup.find_all('div', class_='w-gl__result')
+                    
+                    for idx, result in enumerate(search_results[:max_results], 1):
+                        try:
+                            title_elem = result.find('h3')
+                            link_elem = result.find('a')
+                            snippet_elem = result.find('p', class_='w-gl__description')
+                            
+                            results.append({
+                                'position': idx,
+                                'title': title_elem.get_text().strip() if title_elem else 'No title',
+                                'url': link_elem.get('href', 'No URL') if link_elem else 'No URL',
+                                'snippet': snippet_elem.get_text().strip() if snippet_elem else 'No snippet'
+                            })
+                        except Exception as e:
+                            logger.warning(f"Error parsing Startpage result {idx}: {e}")
+                            continue
+                    
+                    logger.info(f"Startpage found {len(results)} results")
+                    return results
+                    
+                finally:
+                    await browser.close()
+                    
+        except Exception as e:
+            logger.error(f"Startpage search failed for '{keyword}': {e}")
+            return []
+    
     
     async def get_related_searches(self, page, keyword: str) -> List[str]:
         """Get related search terms from Google's 'Searches related to' section"""
@@ -32,26 +125,76 @@ class KeywordResearch:
             
             related_searches = []
             
-            # Find "Searches related to" section
-            related_section = soup.find('div', {'aria-label': 'Searches related to'})
-            if related_section:
-                related_links = related_section.find_all('a')
-                for link in related_links:
-                    related_text = link.get_text().strip()
-                    if related_text and related_text != keyword:
-                        related_searches.append(related_text)
+            # Method 1: Find "Searches related to" section with various selectors
+            related_selectors = [
+                'div[aria-label="Searches related to"]',
+                'div.brs_col',
+                'div[data-ved]',
+                'div.g[data-ved]'
+            ]
             
-            # Alternative method - look for related searches in different containers
-            if not related_searches:
-                related_divs = soup.find_all('div', class_='brs_col')
-                for div in related_divs:
-                    links = div.find_all('a')
+            for selector in related_selectors:
+                related_sections = soup.select(selector)
+                for section in related_sections:
+                    links = section.find_all('a')
                     for link in links:
                         related_text = link.get_text().strip()
-                        if related_text and related_text != keyword:
+                        if (related_text and 
+                            related_text != keyword and 
+                            len(related_text) > 2 and
+                            len(related_text.split()) <= 5):  # Reasonable length
                             related_searches.append(related_text)
             
-            return list(set(related_searches))  # Remove duplicates
+            # Method 2: Extract from search result titles and snippets
+            if not related_searches:
+                search_results = soup.find_all('div', class_='g')
+                for result in search_results:
+                    # Extract from titles
+                    title_elem = result.find('h3')
+                    if title_elem:
+                        title_text = title_elem.get_text().strip()
+                        words = title_text.split()
+                        for word in words:
+                            if (len(word) > 3 and 
+                                word.lower() not in keyword.lower() and
+                                word.lower() not in ['the', 'and', 'for', 'with', 'from', 'this', 'that']):
+                                related_searches.append(word)
+                    
+                    # Extract from snippets
+                    snippet_elem = result.find('span', class_='VuuXrf')
+                    if snippet_elem:
+                        snippet_text = snippet_elem.get_text().strip()
+                        words = snippet_text.split()
+                        for word in words:
+                            if (len(word) > 3 and 
+                                word.lower() not in keyword.lower() and
+                                word.lower() not in ['the', 'and', 'for', 'with', 'from', 'this', 'that']):
+                                related_searches.append(word)
+            
+            # Method 3: Generate common related terms
+            if not related_searches:
+                common_related = [
+                    'strategy', 'tips', 'tools', 'examples', 'benefits', 'guide',
+                    'tutorial', 'best practices', 'techniques', 'methods'
+                ]
+                for term in common_related:
+                    related_searches.append(f"{keyword} {term}")
+                    related_searches.append(f"{term} {keyword}")
+            
+            # Clean and deduplicate
+            cleaned_searches = []
+            seen = set()
+            for term in related_searches:
+                term = term.strip().lower()
+                if (term and 
+                    term not in seen and 
+                    term != keyword.lower() and
+                    len(term) > 2):
+                    cleaned_searches.append(term)
+                    seen.add(term)
+            
+            logger.info(f"Found {len(cleaned_searches)} related searches")
+            return cleaned_searches[:10]
             
         except Exception as e:
             logger.error(f"Error getting related searches for '{keyword}': {e}")
@@ -66,7 +209,7 @@ class KeywordResearch:
             logger.info(f"Getting People Also Ask for: {keyword}")
             await page.goto(search_url, timeout=30000)
             await page.wait_for_load_state("domcontentloaded")
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(3000)  # Wait longer for dynamic content
             
             # Get page content
             html = await page.content()
@@ -74,35 +217,68 @@ class KeywordResearch:
             
             paa_questions = []
             
-            # Find People Also Ask section
-            paa_section = soup.find('div', {'aria-label': 'People also ask'})
-            if paa_section:
-                questions = paa_section.find_all('div', class_='related-question-pair')
-                for question_div in questions:
-                    question_element = question_div.find('div', class_='match-mod-horizontal-padding')
-                    if question_element:
-                        question_text = question_element.get_text().strip()
-                        if question_text:
+            # Method 1: Look for People Also Ask section with various selectors
+            paa_selectors = [
+                'div[aria-label="People also ask"]',
+                'div[data-initq]',
+                'div.g[data-initq]',
+                'div[jsname="Cpkphb"]'
+            ]
+            
+            for selector in paa_selectors:
+                paa_sections = soup.select(selector)
+                for section in paa_sections:
+                    questions = section.find_all(['div', 'span'], string=re.compile(r'\?'))
+                    for question in questions:
+                        question_text = question.get_text().strip()
+                        if question_text and '?' in question_text and len(question_text) > 10:
                             paa_questions.append({
                                 'question': question_text,
                                 'keyword': keyword
                             })
             
-            # Alternative method - look for questions in different containers
+            # Method 2: Look for questions in search results
             if not paa_questions:
                 question_divs = soup.find_all('div', class_='g')
                 for div in question_divs:
-                    # Look for question patterns
-                    question_elements = div.find_all('span', string=re.compile(r'\?'))
+                    # Look for question patterns in various elements
+                    question_elements = div.find_all(['span', 'div', 'h3'], string=re.compile(r'\?'))
                     for element in question_elements:
                         question_text = element.get_text().strip()
-                        if question_text and '?' in question_text:
+                        if (question_text and 
+                            '?' in question_text and 
+                            len(question_text) > 10 and
+                            keyword.lower() in question_text.lower()):
                             paa_questions.append({
                                 'question': question_text,
                                 'keyword': keyword
                             })
             
-            return paa_questions
+            # Method 3: Generate some common questions based on the keyword
+            if not paa_questions:
+                common_questions = [
+                    f"What is {keyword}?",
+                    f"How does {keyword} work?",
+                    f"Why is {keyword} important?",
+                    f"Best practices for {keyword}",
+                    f"How to improve {keyword}?"
+                ]
+                for question in common_questions:
+                    paa_questions.append({
+                        'question': question,
+                        'keyword': keyword
+                    })
+            
+            # Remove duplicates and limit
+            unique_questions = []
+            seen = set()
+            for q in paa_questions:
+                if q['question'] not in seen:
+                    unique_questions.append(q)
+                    seen.add(q['question'])
+            
+            logger.info(f"Found {len(unique_questions)} People Also Ask questions")
+            return unique_questions[:10]
             
         except Exception as e:
             logger.error(f"Error getting People Also Ask for '{keyword}': {e}")
@@ -111,29 +287,125 @@ class KeywordResearch:
     async def get_autocomplete_suggestions(self, page, keyword: str) -> List[str]:
         """Get Google autocomplete suggestions for a keyword"""
         try:
-            # Use Google's autocomplete API endpoint
-            autocomplete_url = f"https://www.google.com/complete/search?client=chrome&q={quote_plus(keyword)}"
-            
             logger.info(f"Getting autocomplete suggestions for: {keyword}")
-            await page.goto(autocomplete_url, timeout=30000)
             
-            # Get the response content
-            content = await page.content()
+            # Method 1: Try to simulate typing in Google search box
+            search_url = "https://www.google.com"
+            await page.goto(search_url, timeout=30000)
+            await page.wait_for_load_state("domcontentloaded")
+            await page.wait_for_timeout(2000)
             
-            # Parse JSON response
+            # Find the search box and type the keyword
+            search_box = page.locator('input[name="q"]')
+            if await search_box.count() > 0:
+                await search_box.fill(keyword)
+                await page.wait_for_timeout(1000)  # Wait for suggestions to appear
+                
+                # Look for autocomplete suggestions
+                html = await page.content()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                suggestions = []
+                
+                # Look for autocomplete suggestions in various containers
+                autocomplete_selectors = [
+                    'div[role="presentation"]',
+                    'div[jsname="aajZCb"]',
+                    'div[class*="aajZCb"]',
+                    'div[class*="erkvQe"]',
+                    'ul[role="listbox"] li',
+                    'div[data-ved] span'
+                ]
+                
+                for selector in autocomplete_selectors:
+                    elements = soup.select(selector)
+                    for element in elements:
+                        text = element.get_text().strip()
+                        if (text and 
+                            text != keyword and 
+                            keyword.lower() in text.lower() and
+                            len(text) > len(keyword) and
+                            len(text.split()) <= 5):
+                            suggestions.append(text)
+                
+                if suggestions:
+                    suggestions = list(set(suggestions))[:10]
+                    logger.info(f"Found {len(suggestions)} autocomplete suggestions via typing simulation")
+                    return suggestions
+            
+            # Method 2: Extract from search results if typing simulation fails
+            search_url = f"https://www.google.com/search?q={quote_plus(keyword)}"
+            await page.goto(search_url, timeout=30000)
+            await page.wait_for_load_state("domcontentloaded")
+            await page.wait_for_timeout(2000)
+            
+            html = await page.content()
+            soup = BeautifulSoup(html, 'html.parser')
+            
             suggestions = []
-            try:
-                # The response is usually wrapped in some HTML, extract JSON
-                json_match = re.search(r'\[(.*?)\]', content, re.DOTALL)
-                if json_match:
-                    json_str = '[' + json_match.group(1) + ']'
-                    data = json.loads(json_str)
-                    if len(data) > 1:
-                        suggestions = data[1]  # Second element contains the suggestions
-            except (json.JSONDecodeError, IndexError):
-                logger.warning(f"Could not parse autocomplete response for '{keyword}'")
             
-            return suggestions[:10]  # Limit to 10 suggestions
+            # Extract from search result titles and snippets
+            search_results = soup.find_all('div', class_='g')
+            for result in search_results:
+                # Extract from titles
+                title_elem = result.find('h3')
+                if title_elem:
+                    title_text = title_elem.get_text().strip()
+                    words = title_text.split()
+                    for i, word in enumerate(words):
+                        if keyword.lower() in word.lower():
+                            # Get surrounding words to form suggestions
+                            start = max(0, i - 1)
+                            end = min(len(words), i + 2)
+                            phrase = ' '.join(words[start:end])
+                            if len(phrase.split()) <= 4 and phrase != keyword:
+                                suggestions.append(phrase)
+                
+                # Extract from snippets
+                snippet_elem = result.find('span', class_='VuuXrf')
+                if snippet_elem:
+                    snippet_text = snippet_elem.get_text().strip()
+                    words = snippet_text.split()
+                    for i, word in enumerate(words):
+                        if keyword.lower() in word.lower():
+                            start = max(0, i - 1)
+                            end = min(len(words), i + 2)
+                            phrase = ' '.join(words[start:end])
+                            if len(phrase.split()) <= 4 and phrase != keyword:
+                                suggestions.append(phrase)
+            
+            # Method 3: Generate common autocomplete suggestions
+            if not suggestions:
+                common_suggestions = [
+                    f"{keyword} strategy",
+                    f"{keyword} tips",
+                    f"{keyword} examples",
+                    f"{keyword} tools",
+                    f"{keyword} guide",
+                    f"{keyword} best practices",
+                    f"{keyword} benefits",
+                    f"{keyword} tutorial",
+                    f"{keyword} ideas",
+                    f"{keyword} 2024",
+                    f"{keyword} 2025"
+                ]
+                suggestions = common_suggestions
+            
+            # Clean and deduplicate
+            cleaned_suggestions = []
+            seen = set()
+            for suggestion in suggestions:
+                suggestion = suggestion.strip().lower()
+                if (suggestion and 
+                    suggestion not in seen and 
+                    suggestion != keyword.lower() and
+                    len(suggestion) > len(keyword) and
+                    len(suggestion.split()) <= 5):
+                    cleaned_suggestions.append(suggestion)
+                    seen.add(suggestion)
+            
+            logger.info(f"Found {len(cleaned_suggestions)} autocomplete suggestions")
+            return cleaned_suggestions[:10]
             
         except Exception as e:
             logger.error(f"Error getting autocomplete suggestions for '{keyword}': {e}")
@@ -155,24 +427,68 @@ class KeywordResearch:
             
             long_tail_keywords = []
             
-            # Extract text from snippets that might contain long-tail variations
-            snippets = soup.find_all('span', class_='VuuXrf')
-            for snippet in snippets:
-                snippet_text = snippet.get_text().lower()
-                # Look for phrases that contain the original keyword
-                if keyword.lower() in snippet_text:
-                    # Extract potential long-tail variations
-                    words = snippet_text.split()
+            # Method 1: Extract from snippets with various selectors
+            snippet_selectors = [
+                'span.VuuXrf',
+                'span.st',
+                'div.VwiC3b',
+                'span[data-ved]',
+                'div[data-ved]'
+            ]
+            
+            for selector in snippet_selectors:
+                snippets = soup.select(selector)
+                for snippet in snippets:
+                    snippet_text = snippet.get_text().strip()
+                    if snippet_text and keyword.lower() in snippet_text.lower():
+                        # Extract potential long-tail variations
+                        words = snippet_text.split()
+                        for i, word in enumerate(words):
+                            if keyword.lower() in word.lower():
+                                # Get surrounding words to form long-tail phrases
+                                start = max(0, i - 2)
+                                end = min(len(words), i + 3)
+                                phrase = ' '.join(words[start:end])
+                                if len(phrase.split()) >= 3:  # Long-tail should be at least 3 words
+                                    long_tail_keywords.append(phrase)
+            
+            # Method 2: Extract from titles
+            titles = soup.find_all(['h3', 'h2', 'h1'])
+            for title in titles:
+                title_text = title.get_text().strip()
+                if title_text and keyword.lower() in title_text.lower():
+                    words = title_text.split()
                     for i, word in enumerate(words):
-                        if keyword.lower() in word:
-                            # Get surrounding words to form long-tail phrases
-                            start = max(0, i - 2)
-                            end = min(len(words), i + 3)
+                        if keyword.lower() in word.lower():
+                            start = max(0, i - 1)
+                            end = min(len(words), i + 2)
                             phrase = ' '.join(words[start:end])
-                            if len(phrase.split()) >= 3:  # Long-tail should be at least 3 words
+                            if len(phrase.split()) >= 2:
                                 long_tail_keywords.append(phrase)
             
-            return list(set(long_tail_keywords))[:10]  # Remove duplicates and limit to 10
+            # Method 3: Generate common long-tail variations
+            if not long_tail_keywords:
+                common_modifiers = [
+                    'how to', 'what is', 'best', 'guide', 'tutorial', 'tips', 'strategies',
+                    'tools', 'examples', 'benefits', 'advantages', 'disadvantages', 'vs',
+                    'comparison', 'review', '2024', '2025', 'free', 'paid', 'online'
+                ]
+                
+                for modifier in common_modifiers:
+                    long_tail_keywords.append(f"{modifier} {keyword}")
+                    long_tail_keywords.append(f"{keyword} {modifier}")
+            
+            # Clean and deduplicate
+            cleaned_keywords = []
+            for phrase in long_tail_keywords:
+                phrase = phrase.strip().lower()
+                if (len(phrase.split()) >= 2 and 
+                    len(phrase) > len(keyword) and 
+                    phrase not in cleaned_keywords):
+                    cleaned_keywords.append(phrase)
+            
+            logger.info(f"Found {len(cleaned_keywords)} long-tail keywords")
+            return cleaned_keywords[:10]
             
         except Exception as e:
             logger.error(f"Error getting long-tail keywords for '{keyword}': {e}")
@@ -180,6 +496,43 @@ class KeywordResearch:
     
     async def research_keyword(self, keyword: str) -> Dict:
         """Perform comprehensive keyword research for a single keyword"""
+        # First try Google CSE API (most reliable)
+        search_results = await self.search_google_cse(keyword, 10)
+        
+        # If CSE fails, try Startpage as fallback
+        if not search_results:
+            logger.info("Google CSE API failed, trying Startpage...")
+            search_results = await self.search_startpage(keyword, 10)
+        
+        # If that fails, try DuckDuckGo as last resort
+        if not search_results:
+            logger.info("Startpage search failed, trying DuckDuckGo...")
+            search_results = await self.search_duckduckgo_improved(keyword, 10)
+        
+        # Extract related keywords from search results
+        related_searches = []
+        paa_questions = []
+        autocomplete_suggestions = []
+        long_tail_keywords = []
+        
+        if search_results:
+            # Extract potential related terms from titles and snippets
+            for result in search_results:
+                title = result.get('title', '').lower()
+                snippet = result.get('snippet', '').lower()
+                
+                # Extract words that might be related to the original keyword
+                words = (title + ' ' + snippet).split()
+                for word in words:
+                    if (len(word) > 3 and 
+                        word not in keyword.lower() and 
+                        word not in ['the', 'and', 'for', 'with', 'from', 'this', 'that', 'are', 'was', 'were']):
+                        related_searches.append(word)
+            
+            # Remove duplicates and limit
+            related_searches = list(set(related_searches))[:10]
+        
+        # Use web scraping as fallback for more detailed research
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=self.headless)
             page = await browser.new_page()
@@ -190,19 +543,23 @@ class KeywordResearch:
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 })
                 
-                # Get all types of related keywords
-                related_searches = await self.get_related_searches(page, keyword)
+                # Get additional related keywords using web scraping
+                web_related_searches = await self.get_related_searches(page, keyword)
                 paa_questions = await self.get_people_also_ask(page, keyword)
                 autocomplete_suggestions = await self.get_autocomplete_suggestions(page, keyword)
                 long_tail_keywords = await self.get_long_tail_keywords(page, keyword)
                 
+                # Combine API and web scraping results
+                all_related_searches = list(set(related_searches + web_related_searches))[:10]
+                
                 result = {
                     'primary_keyword': keyword,
-                    'related_searches': related_searches[:10],  # Limit to 10
-                    'people_also_ask': paa_questions[:10],  # Limit to 10
-                    'autocomplete_suggestions': autocomplete_suggestions[:10],  # Limit to 10
-                    'long_tail_keywords': long_tail_keywords[:10],  # Limit to 10
-                    'total_related_terms': len(related_searches) + len(paa_questions) + len(autocomplete_suggestions) + len(long_tail_keywords),
+                    'search_results': search_results,  # Include the search results
+                    'related_searches': all_related_searches,
+                    'people_also_ask': paa_questions[:10],
+                    'autocomplete_suggestions': autocomplete_suggestions[:10],
+                    'long_tail_keywords': long_tail_keywords[:10],
+                    'total_related_terms': len(all_related_searches) + len(paa_questions) + len(autocomplete_suggestions) + len(long_tail_keywords),
                     'timestamp': time.time(),
                     'date': time.strftime('%Y-%m-%d %H:%M:%S')
                 }
@@ -251,9 +608,18 @@ class KeywordResearch:
             paa = result['people_also_ask']
             autocomplete = result['autocomplete_suggestions']
             long_tail = result['long_tail_keywords']
+            search_results = result.get('search_results', [])
             
             print(f"\nPrimary Keyword: {keyword}")
             print(f"Total Related Terms Found: {result['total_related_terms']}")
+            print(f"Search Results Found: {len(search_results)}")
+            
+            if search_results:
+                print(f"\nTop Search Results ({len(search_results)}):")
+                for i, res in enumerate(search_results[:3], 1):
+                    print(f"  {i}. {res['title']} - {res['url']}")
+                if len(search_results) > 3:
+                    print(f"  ... and {len(search_results) - 3} more")
             
             if related:
                 print(f"\nRelated Searches ({len(related)}):")
@@ -292,8 +658,7 @@ async def main():
     
     # Example keywords to research
     keywords = [
-        "python web scraping",
-        "SEO tools",
+        
         "content marketing"
     ]
     
