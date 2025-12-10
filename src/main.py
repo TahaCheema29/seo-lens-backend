@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pathlib import Path
 from src.config.settings import settings
 import src.routers.seo_tools as seo_tools
 
@@ -24,3 +26,12 @@ app.include_router(seo_tools.router)
 @app.get("/")
 async def root():
     return {"message": "Verdant Soft SEO API is running 🚀"}
+
+
+@app.get("/seo-test-ui")
+async def seo_test_ui():
+    """Serve the SEO Test UI"""
+    ui_path = Path(__file__).parent / "static" / "seo_test_ui.html"
+    if ui_path.exists():
+        return FileResponse(ui_path)
+    return {"error": "UI file not found"}
