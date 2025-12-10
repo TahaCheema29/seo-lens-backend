@@ -2,4 +2,6 @@ app.log
 *__pycache__
 #output file
 seo_results.csv
-config.py
+seo_results.html
+*.json
+.env.*

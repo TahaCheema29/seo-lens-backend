@@ -62,51 +62,6 @@ class KeywordResearch:
             logger.error(f"Google CSE API search failed for '{keyword}': {e}")
             return []
     
-    async def search_startpage(self, keyword: str, max_results: int = 10) -> List[Dict]:
-        """Fallback search using Startpage"""
-        try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
-                page = await browser.new_page()
-                
-                try:
-                    search_url = f"https://www.startpage.com/sp/search?query={quote_plus(keyword)}"
-                    await page.goto(search_url, timeout=30000)
-                    await page.wait_for_load_state("domcontentloaded")
-                    await page.wait_for_timeout(2000)
-                    
-                    html = await page.content()
-                    soup = BeautifulSoup(html, 'html.parser')
-                    
-                    results = []
-                    search_results = soup.find_all('div', class_='w-gl__result')
-                    
-                    for idx, result in enumerate(search_results[:max_results], 1):
-                        try:
-                            title_elem = result.find('h3')
-                            link_elem = result.find('a')
-                            snippet_elem = result.find('p', class_='w-gl__description')
-                            
-                            results.append({
-                                'position': idx,
-                                'title': title_elem.get_text().strip() if title_elem else 'No title',
-                                'url': link_elem.get('href', 'No URL') if link_elem else 'No URL',
-                                'snippet': snippet_elem.get_text().strip() if snippet_elem else 'No snippet'
-                            })
-                        except Exception as e:
-                            logger.warning(f"Error parsing Startpage result {idx}: {e}")
-                            continue
-                    
-                    logger.info(f"Startpage found {len(results)} results")
-                    return results
-                    
-                finally:
-                    await browser.close()
-                    
-        except Exception as e:
-            logger.error(f"Startpage search failed for '{keyword}': {e}")
-            return []
-    
     
     async def get_related_searches(self, page, keyword: str) -> List[str]:
         """Get related search terms from Google's 'Searches related to' section"""

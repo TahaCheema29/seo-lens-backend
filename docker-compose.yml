@@ -1,9 +1,15 @@
+<<<<<<< HEAD
+=======
+version: "3.9"
+
+>>>>>>> 43d941915cb4c47697e1f2b55cb910336a663044
 services:
   seo-lens:
     build: 
       context: .
       dockerfile: Dockerfile
     container_name: seo-lens
+<<<<<<< HEAD
     volumes:
       - .:/app
     tty: true
@@ -27,3 +33,35 @@ services:
       - .:/app
     command: python keyword_research.py
     tty: true
+=======
+    restart: always
+    depends_on:
+      - redis
+    env_file:
+      - .env.local
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"   # ✅ exposes FastAPI
+    command: >
+      sh -c "playwright install chromium && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/src"
+
+  redis:
+    image: redis:8.2.2
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+    env_file:
+      - .env.local
+    command: [
+      "redis-server",
+      "--appendonly", "yes",
+      "--requirepass", "${REDIS_PASSWORD}"
+    ]
+
+volumes:
+  redis_data:
+>>>>>>> 43d941915cb4c47697e1f2b55cb910336a663044
