@@ -3,7 +3,7 @@ from src.utils.analyze_keyword_rank import KeywordRankChecker
 from src.schemas.analyze_keyword_rank import AnalyzeKeywordRankRequest
 from src.utils.suggest_keyword import KeywordResearch
 from src.schemas.suggest_keywords import SuggestKeywordRequest
-from src.schemas.analyze_site_seo import AnalyzeSiteSeoRequest, AnalyzeSiteSeoResult
+from src.schemas.analyze_site_seo import AnalyzeSiteSeoRequest, AnalyzeSiteSeoResponse
 from src.utils.seo_crawler import SEOCrawler
 from src.utils.seo_scraper import SEOScraper
 
@@ -32,7 +32,7 @@ class SeoToolsService:
         return results
     
 
-    async def analyze_site_seo(self,user_input:AnalyzeSiteSeoRequest)-> list[AnalyzeSiteSeoResult]:
+    async def analyze_site_seo(self,user_input:AnalyzeSiteSeoRequest)-> AnalyzeSiteSeoResponse:
       
         start_time = time.perf_counter()
 
@@ -42,9 +42,9 @@ class SeoToolsService:
 
         print("url is ",urls)
         # 2. Scrape SEO Data
-        scraper = SEOScraper(user_input.url)
+        scraper = SEOScraper(str(user_input.url))
         results = await scraper.run(urls)
         scraper.save_to_html()
 
-        print(f"Done in {time.perf_counter() - start_time:.2f}s — {len(results)} pages analyzed")
+        print(f"Done in {time.perf_counter() - start_time:.2f}s — {len(results.url_results)} pages analyzed")
         return results

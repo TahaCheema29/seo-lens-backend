@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from src.config.redis_client import redis_client
 from src.config.settings import settings
 from src.config.logger_config import setup_logger
-from src.schemas.analyze_site_seo import AnalyzeSiteSeoResult
+from src.schemas.analyze_site_seo import AnalyzeSiteSeoResult, BaseUrlChecks, AnalyzeSiteSeoResponse, CheckResult, CheckStatus
 
 load_dotenv()
 logger = setup_logger(__name__)
@@ -24,6 +24,7 @@ class SEOScraper:
         self.lock = asyncio.Lock()
         self.google_cloud_api_key_3 = settings.google_cloud_api_key_3
         self.logger = setup_logger(__name__)
+        self.base_url_checks = None
 
     @staticmethod
     def extract_keywords_from_text(text):
@@ -126,9 +127,21 @@ class SEOScraper:
         h2_tags = [h.get_text(strip=True) for h in soup.find_all("h2")]
         h3_tags = [h.get_text(strip=True) for h in soup.find_all("h3")]
 
-        h1_check = "✅ Exactly one H1" if len(h1_tags) == 1 else (
-            f"❌ {len(h1_tags)} H1 tags found" if h1_tags else "❌ No H1 tag"
-        )
+        if len(h1_tags) == 1:
+            h1_check = CheckResult(
+                status=CheckStatus.PASS,
+                description="The page has exactly one H1 tag, which is optimal for SEO. Each page should have a single H1 tag that clearly describes the page content."
+            )
+        elif len(h1_tags) > 1:
+            h1_check = CheckResult(
+                status=CheckStatus.FAIL,
+                description=f"Multiple H1 tags ({len(h1_tags)}) were found. Each page should have only one H1 tag for optimal SEO. Consider consolidating or removing extra H1 tags."
+            )
+        else:
+            h1_check = CheckResult(
+                status=CheckStatus.FAIL,
+                description="No H1 tag was found on the page. H1 tags are important for SEO as they indicate the main heading of the page. Add an H1 tag with your primary keyword."
+            )
         h1_keyword_guidance = "Consider including primary keyword in H1" if h1_tags else "Add an H1 tag with your primary keyword"
         
         h2_count = len(h2_tags)
@@ -145,11 +158,16 @@ class SEOScraper:
             if not img.get("alt")
             or img.get("alt", "").strip().lower() in bad_alt_keywords
         ]
-        alt_check = (
-            "✅ All images have descriptive alt attributes"
-            if not missing_or_poor_alts
-            else f"❌ {len(missing_or_poor_alts)}/{len(img_tags)} images missing/poor alt text"
-        )
+        if not missing_or_poor_alts:
+            alt_check = CheckResult(
+                status=CheckStatus.PASS,
+                description="All images on the page have proper alt text, which improves accessibility and helps search engines understand image content."
+            )
+        else:
+            alt_check = CheckResult(
+                status=CheckStatus.FAIL,
+                description=f"{len(missing_or_poor_alts)} out of {len(img_tags)} images are missing alt attributes or have generic alt text. Add descriptive alt text to all images for better SEO and accessibility."
+            )
 
         # === BASIC SEO: Links ===
         all_links = soup.find_all("a", href=True)
@@ -187,7 +205,16 @@ class SEOScraper:
             if canonical_tag and canonical_tag.get("href")
             else ""
         )
-        canonical_check = "✅ Found" if canonical else "❌ Not found"
+        if canonical:
+            canonical_check = CheckResult(
+                status=CheckStatus.PASS,
+                description="The page has a canonical tag, which helps prevent duplicate content issues by specifying the preferred URL for the page."
+            )
+        else:
+            canonical_check = CheckResult(
+                status=CheckStatus.WARNING,
+                description="No canonical tag was found. Adding a canonical tag helps prevent duplicate content issues and tells search engines which URL is the preferred version of the page."
+            )
 
         # === ADVANCED SEO: Noindex ===
         noindex_meta = soup.find("meta", attrs={"name": "robots"})
@@ -196,13 +223,16 @@ class SEOScraper:
             (noindex_meta and "noindex" in noindex_meta.get("content", "").lower()) or
             "noindex" in noindex_header.lower()
         )
-        noindex_check = "❌ Found (page will not be indexed)" if has_noindex else "✅ Not found"
-
-        # === ADVANCED SEO: WWW Redirect Check ===
-        www_check = "⚠️ Manual check needed"  # Will be checked separately via HTTP request
-
-        # === ADVANCED SEO: Robots.txt ===
-        robots_check = "⚠️ Not checked in scraper"  # Will be checked separately
+        if has_noindex:
+            noindex_check = CheckResult(
+                status=CheckStatus.FAIL,
+                description="The page has a noindex directive, which prevents search engines from indexing this page. Remove the noindex directive if you want this page to appear in search results."
+            )
+        else:
+            noindex_check = CheckResult(
+                status=CheckStatus.PASS,
+                description="The page does not have a noindex directive, so it can be indexed by search engines."
+            )
 
         # === ADVANCED SEO: Open Graph ===
         og_tags = {
@@ -212,16 +242,21 @@ class SEOScraper:
             "url": soup.find("meta", attrs={"property": "og:url"}),
         }
         missing_og = [key for key, tag in og_tags.items() if not tag]
-        og_check = (
-            "✅ All Open Graph tags present"
-            if not missing_og
-            else f"⚠️ Missing: {', '.join(missing_og)}"
-        )
+        if not missing_og:
+            og_check = CheckResult(
+                status=CheckStatus.PASS,
+                description="All essential Open Graph tags (title, type, image, url) are present, which ensures proper display when the page is shared on social media platforms."
+            )
+        else:
+            og_check = CheckResult(
+                status=CheckStatus.WARNING,
+                description=f"The page is missing some Open Graph tags ({', '.join(missing_og)}). Adding these tags improves how the page appears when shared on social media platforms like Facebook, Twitter, and LinkedIn."
+            )
 
         # === ADVANCED SEO: Schema ===
         schema_scripts = soup.find_all("script", type="application/ld+json")
         schema_types = []
-        schema_validation = ""
+        schema_validation = None
         if schema_scripts:
             for s in schema_scripts:
                 try:
@@ -233,22 +268,45 @@ class SEOScraper:
                     ]
                     schema_types.extend(types)
                 except:
-                    schema_validation = "❌ Invalid JSON-LD format"
-            schema_validation = schema_validation or (
-                f"✅ Valid Schema Found: {', '.join(set(schema_types))}"
-                if schema_types
-                else "⚠️ No recognizable schema"
-            )
+                    schema_validation = CheckResult(
+                        status=CheckStatus.FAIL,
+                        description="The page contains structured data, but the JSON-LD format is invalid. Fix the JSON-LD syntax to ensure search engines can properly parse the structured data."
+                    )
+            if not schema_validation:
+                if schema_types:
+                    schema_validation = CheckResult(
+                        status=CheckStatus.PASS,
+                        description=f"The page contains valid structured data (schema.org) with types: {', '.join(set(schema_types))}. This helps search engines better understand the page content."
+                    )
+                else:
+                    schema_validation = CheckResult(
+                        status=CheckStatus.WARNING,
+                        description="The page contains structured data scripts, but no recognizable schema types were found. Ensure the JSON-LD contains valid @type properties."
+                    )
         else:
-            schema_validation = "❌ No structured data found"
+            schema_validation = CheckResult(
+                status=CheckStatus.WARNING,
+                description="The page does not contain structured data (schema.org markup). Adding structured data helps search engines better understand your content and can improve visibility in search results with rich snippets."
+            )
 
         # === PERFORMANCE: HTML Size ===
         html_size = len(html.encode('utf-8'))
         html_size_kb = html_size / 1024
-        html_size_check = (
-            "✅ Good" if html_size_kb < 100 else
-            "⚠️ Large" if html_size_kb < 500 else "❌ Very large"
-        )
+        if html_size_kb < 100:
+            html_size_check = CheckResult(
+                status=CheckStatus.PASS,
+                description=f"The HTML document size is {html_size_kb:.1f} KB, which is optimal for fast page loading."
+            )
+        elif html_size_kb < 500:
+            html_size_check = CheckResult(
+                status=CheckStatus.WARNING,
+                description=f"The HTML document size is {html_size_kb:.1f} KB, which is larger than recommended. Consider optimizing the HTML by removing unnecessary code, minifying, or splitting content."
+            )
+        else:
+            html_size_check = CheckResult(
+                status=CheckStatus.FAIL,
+                description=f"The HTML document size is {html_size_kb:.1f} KB, which is very large and will significantly impact page load times. Consider optimizing by removing unnecessary code, minifying HTML, or splitting content across multiple pages."
+            )
 
         # === PERFORMANCE: Inline CSS & Whitespace ===
         inline_styles = soup.find_all(style=True)
@@ -265,40 +323,52 @@ class SEOScraper:
 
         # === PERFORMANCE: Embedded Objects ===
         embedded_objects = soup.find_all(["object", "embed", "applet"])
-        embedded_check = (
-            "✅ No embedded objects found"
-            if not embedded_objects
-            else f"⚠️ {len(embedded_objects)} embedded objects - consider HTML5 alternatives"
-        )
-
-        # === SECURITY: HTTPS/SSL ===
-        is_https = parsed_url.scheme == "https"
-        https_check = "✅ HTTPS enabled" if is_https else "❌ Not using HTTPS"
-
-        # === SECURITY: Directory Listing ===
-        directory_listing_check = "⚠️ Not checked in scraper"  # Will be checked separately
-
-        # === SECURITY: Google Safe Browsing ===
-        safe_browsing_check = "⚠️ Not checked in scraper"  # Will be checked separately
+        if not embedded_objects:
+            embedded_check = CheckResult(
+                status=CheckStatus.PASS,
+                description="The page does not use deprecated embedded objects (object, embed, applet tags), which is good for modern web standards."
+            )
+        else:
+            embedded_check = CheckResult(
+                status=CheckStatus.WARNING,
+                description=f"The page contains {len(embedded_objects)} deprecated embedded objects. Consider using HTML5 alternatives (like video, audio, or iframe tags) for better compatibility and performance."
+            )
 
         # === Mobile Responsiveness ===
         viewport_tag = soup.find("meta", attrs={"name": "viewport"})
-        mobile_responsiveness = (
-            "✅ Viewport meta found"
-            if viewport_tag and "width=device-width" in viewport_tag.get("content", "")
-            else "❌ Missing or incorrect viewport tag"
-        )
+        if viewport_tag and "width=device-width" in viewport_tag.get("content", ""):
+            mobile_responsiveness = CheckResult(
+                status=CheckStatus.PASS,
+                description="The page has a properly configured viewport meta tag, which ensures the page displays correctly on mobile devices."
+            )
+        else:
+            mobile_responsiveness = CheckResult(
+                status=CheckStatus.FAIL,
+                description="The page is missing a viewport meta tag or it's not configured correctly. Add <meta name='viewport' content='width=device-width, initial-scale=1'> to ensure proper mobile display."
+            )
 
         return {
             "url": url,
             # Basic SEO - Title & Description
             "title": title,
-            "title_length_check": f"{title_quality['status']} ({title_quality['length']} chars)",
-            "title_keyword_presence": "✅ Keywords detected" if title_keywords else "⚠️ No clear keywords",
+            "title_length_check": CheckResult(
+                status=CheckStatus.PASS if "✅" in title_quality['status'] else (CheckStatus.FAIL if "❌" in title_quality['status'] else CheckStatus.WARNING),
+                description=title_quality['guidance']
+            ),
+            "title_keyword_presence": CheckResult(
+                status=CheckStatus.PASS if title_keywords else CheckStatus.WARNING,
+                description="Keywords found in title tag" if title_keywords else "Consider including relevant keywords in the title tag to improve SEO."
+            ),
             "title_quality_guidance": title_quality['guidance'],
             "meta_description": meta_description,
-            "meta_description_length_check": f"{description_quality['status']} ({description_quality['length']} chars)",
-            "meta_description_keyword_presence": "✅ Keywords detected" if desc_keywords else "⚠️ No clear keywords",
+            "meta_description_length_check": CheckResult(
+                status=CheckStatus.PASS if "✅" in description_quality['status'] else (CheckStatus.FAIL if "❌" in description_quality['status'] else CheckStatus.WARNING),
+                description=description_quality['guidance']
+            ),
+            "meta_description_keyword_presence": CheckResult(
+                status=CheckStatus.PASS if desc_keywords else CheckStatus.WARNING,
+                description="Keywords found in meta description" if desc_keywords else "Consider including relevant keywords in the meta description to improve SEO."
+            ),
             "meta_description_quality_guidance": description_quality['guidance'],
             "meta_keywords": meta_keywords,
             # Basic SEO - Headings
@@ -316,15 +386,13 @@ class SEOScraper:
             "external_links_count": external_count,
             "links_quality_guidance": links_guidance_text,
             # Advanced SEO
-            "canonical_check": canonical_check,
-            "canonical": canonical,
-            "noindex_check": noindex_check,
-            "www_redirect_check": www_check,
-            "robots_txt_check": robots_check,
-            "open_graph_check": og_check,
-            "schema_validation": schema_validation,
+            "canonical_check": canonical_check, 
+            "canonical": canonical,  
+            "noindex_check": noindex_check,   
+            "open_graph_check": og_check,   
+            "schema_validation": schema_validation,     
             # Performance
-            "html_size_check": f"{html_size_check} ({html_size_kb:.1f} KB)",
+            "html_size_check": html_size_check,
             "html_size_bytes": html_size,
             "inline_css_warning": performance_guidance,
             "embedded_objects_check": embedded_check,
@@ -369,10 +437,19 @@ class SEOScraper:
             robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
             response = requests.get(robots_url, timeout=5)
             if response.status_code == 200:
-                return "✅ Available"
-            return "❌ Not found or inaccessible"
-        except Exception:
-            return "❌ Error checking robots.txt"
+                return CheckResult(
+                    status=CheckStatus.PASS,
+                    description="The robots.txt file is accessible and can be used by search engines to understand crawling rules."
+                )
+            return CheckResult(
+                status=CheckStatus.FAIL,
+                description="The robots.txt file is missing or cannot be accessed. This may prevent proper search engine crawling control."
+            )
+        except Exception as e:
+            return CheckResult(
+                status=CheckStatus.FAIL,
+                description=f"Could not verify robots.txt availability: {str(e)}"
+            )
 
     async def check_www_redirect(self, url):
         """Check WWW vs non-WWW redirect consistency"""
@@ -392,10 +469,19 @@ class SEOScraper:
             final_url = response.url
             
             if final_url == url or urlparse(final_url).netloc == urlparse(url).netloc:
-                return "✅ Consistent redirect"
-            return "⚠️ Redirects to different domain"
-        except Exception:
-            return "⚠️ Could not verify redirect"
+                return CheckResult(
+                    status=CheckStatus.PASS,
+                    description="The site properly redirects between www and non-www versions, ensuring consistent URL structure."
+                )
+            return CheckResult(
+                status=CheckStatus.WARNING,
+                description="The redirect between www and non-www versions may not be properly configured, which could cause duplicate content issues."
+            )
+        except Exception as e:
+            return CheckResult(
+                status=CheckStatus.WARNING,
+                description=f"Unable to check redirect consistency: {str(e)}"
+            )
 
     async def check_directory_listing(self, url):
         """Check if directory listing is enabled"""
@@ -409,45 +495,110 @@ class SEOScraper:
             if response.status_code == 200:
                 content = response.text.lower()
                 if any(indicator in content for indicator in ["index of", "directory listing", "parent directory"]):
-                    return "❌ Directory listing enabled"
-            return "✅ Directory listing disabled"
-        except Exception:
-            return "⚠️ Could not verify"
+                    return CheckResult(
+                        status=CheckStatus.FAIL,
+                        description="Directory listing is enabled, which can expose sensitive files and directory structure to unauthorized users."
+                    )
+            return CheckResult(
+                status=CheckStatus.PASS,
+                description="Directory listing is properly disabled, preventing unauthorized access to directory contents."
+            )
+        except Exception as e:
+            return CheckResult(
+                status=CheckStatus.WARNING,
+                description=f"Unable to check directory listing status: {str(e)}"
+            )
 
-    async def check_safe_browsing(self, url):
-        """Check Google Safe Browsing status"""
+
+    async def check_base_url(self, base_url: str) -> BaseUrlChecks:
+        """Perform checks that should only be done on the base URL"""
+        # Convert to string if it's an HttpUrl object
+        base_url_str = str(base_url) if base_url else ""
+        parsed = urlparse(base_url_str)
+        base_domain = f"{parsed.scheme}://{parsed.netloc}"
+        
+        # Perform all base URL checks
+        www_check = await self.check_www_redirect(base_domain)
+        robots_check = await self.check_robots_txt(base_domain)
+        
+        # HTTPS check
+        if parsed.scheme == "https":
+            https_check = CheckResult(
+                status=CheckStatus.PASS,
+                description="The site uses HTTPS encryption, which is essential for security and SEO. Search engines prefer HTTPS sites."
+            )
+        else:
+            https_check = CheckResult(
+                status=CheckStatus.FAIL,
+                description="The site is not using HTTPS encryption. This is a security risk and can negatively impact SEO rankings. Consider implementing SSL/TLS certificates."
+            )
+        
+        directory_check = await self.check_directory_listing(base_domain)
+        
+        # Check expires headers and caching (need to make a request to base URL)
         try:
-            # Using a simple check via Google's public API
-            api_url = "https://transparencyreport.google.com/safe-browsing/search"
-            # Note: This is a simplified check - full API requires API key
-            return "⚠️ Manual check recommended (requires API key for full check)"
-        except Exception:
-            return "⚠️ Could not verify"
+            response = requests.get(base_domain, timeout=10, allow_redirects=True)
+            response_headers = response.headers
+            perf_headers = await self.analyze_performance_headers(response_headers)
+            expires_check = perf_headers.get("expires_headers_check")
+            caching_advice = perf_headers.get("caching_advice")
+        except Exception as e:
+            self.logger.error(f"Error checking performance headers for base URL: {e}")
+            expires_check = CheckResult(
+                status=CheckStatus.WARNING,
+                description=f"Error checking performance headers: {str(e)}"
+            )
+            caching_advice = CheckResult(
+                status=CheckStatus.WARNING,
+                description=f"Error checking caching headers: {str(e)}"
+            )
+        
+        return BaseUrlChecks(
+            base_url=base_domain,
+            www_redirect_check=www_check,
+            robots_txt_check=robots_check,
+            https_ssl_check=https_check,
+            directory_listing_check=directory_check,
+            expires_headers_check=expires_check,
+            caching_advice=caching_advice,
+        )
 
     async def analyze_performance_headers(self, response_headers):
         """Analyze performance-related HTTP headers"""
-        expires_check = "❌ No expires headers for images"  # Would need to check image responses
-        caching_advice = []
+        # Check for expires headers (simplified - would ideally check image responses)
+        expires_check = CheckResult(
+            status=CheckStatus.WARNING,
+            description="To fully verify expires headers, individual image responses need to be checked. This is a simplified check."
+        )
         
         cache_control = response_headers.get("Cache-Control", "")
-        if cache_control:
-            if "max-age" in cache_control:
-                caching_advice.append("✅ Cache-Control header found")
-            else:
-                caching_advice.append("⚠️ Cache-Control present but no max-age")
-        else:
-            caching_advice.append("❌ No Cache-Control header")
-        
         expires = response_headers.get("Expires", "")
-        if expires:
-            caching_advice.append("✅ Expires header found")
         
-        if not cache_control and not expires:
-            caching_advice.append("Consider adding caching headers or using a CDN")
+        # Determine caching status
+        if cache_control and "max-age" in cache_control:
+            caching_advice = CheckResult(
+                status=CheckStatus.PASS,
+                description="The site has proper caching headers configured, which helps improve page load times for returning visitors."
+            )
+        elif cache_control:
+            caching_advice = CheckResult(
+                status=CheckStatus.WARNING,
+                description="Cache-Control header exists but doesn't specify max-age. Consider adding max-age for better caching control."
+            )
+        elif expires:
+            caching_advice = CheckResult(
+                status=CheckStatus.PASS,
+                description="The site uses Expires headers for caching, which helps improve performance."
+            )
+        else:
+            caching_advice = CheckResult(
+                status=CheckStatus.FAIL,
+                description="No Cache-Control or Expires headers detected. Consider adding caching headers or using a CDN to improve page load times."
+            )
         
         return {
             "expires_headers_check": expires_check,
-            "caching_advice": "; ".join(caching_advice) if caching_advice else "✅ Good caching setup"
+            "caching_advice": caching_advice
         }
 
     async def analyze_resource_minification(self, page):
@@ -474,14 +625,49 @@ class SEOScraper:
             minified_js = sum(1 for f in js_files if ".min.js" in f or "minified" in f.lower())
             minified_css = sum(1 for f in css_files if ".min.css" in f or "minified" in f.lower())
             
-            js_check = (
-                f"✅ {minified_js}/{len(js_files)} JS files appear minified"
-                if js_files else "⚠️ No external JS files found"
-            )
-            css_check = (
-                f"✅ {minified_css}/{len(css_files)} CSS files appear minified"
-                if css_files else "⚠️ No external CSS files found"
-            )
+            if js_files:
+                if minified_js == len(js_files):
+                    js_check = CheckResult(
+                        status=CheckStatus.PASS,
+                        description=f"All {len(js_files)} JavaScript files appear to be minified, which reduces file size and improves page load times."
+                    )
+                elif minified_js > 0:
+                    js_check = CheckResult(
+                        status=CheckStatus.WARNING,
+                        description=f"Only {minified_js} out of {len(js_files)} JavaScript files appear to be minified. Consider minifying all JS files to improve performance."
+                    )
+                else:
+                    js_check = CheckResult(
+                        status=CheckStatus.WARNING,
+                        description=f"None of the {len(js_files)} JavaScript files appear to be minified. Minifying JS files can significantly reduce file size and improve page load times."
+                    )
+            else:
+                js_check = CheckResult(
+                    status=CheckStatus.WARNING,
+                    description="No external JavaScript files were detected on the page."
+                )
+            
+            if css_files:
+                if minified_css == len(css_files):
+                    css_check = CheckResult(
+                        status=CheckStatus.PASS,
+                        description=f"All {len(css_files)} CSS files appear to be minified, which reduces file size and improves page load times."
+                    )
+                elif minified_css > 0:
+                    css_check = CheckResult(
+                        status=CheckStatus.WARNING,
+                        description=f"Only {minified_css} out of {len(css_files)} CSS files appear to be minified. Consider minifying all CSS files to improve performance."
+                    )
+                else:
+                    css_check = CheckResult(
+                        status=CheckStatus.WARNING,
+                        description=f"None of the {len(css_files)} CSS files appear to be minified. Minifying CSS files can significantly reduce file size and improve page load times."
+                    )
+            else:
+                css_check = CheckResult(
+                    status=CheckStatus.WARNING,
+                    description="No external CSS files were detected on the page."
+                )
             
             return {
                 "js_minification_check": js_check,
@@ -492,8 +678,14 @@ class SEOScraper:
         except Exception as e:
             self.logger.error(f"Error checking minification: {e}")
             return {
-                "js_minification_check": "⚠️ Could not verify",
-                "css_minification_check": "⚠️ Could not verify",
+                "js_minification_check": CheckResult(
+                    status=CheckStatus.WARNING,
+                    description=f"Error checking JavaScript minification: {str(e)}"
+                ),
+                "css_minification_check": CheckResult(
+                    status=CheckStatus.WARNING,
+                    description=f"Error checking CSS minification: {str(e)}"
+                ),
                 "total_js_files": 0,
                 "total_css_files": 0
             }
@@ -557,16 +749,22 @@ class SEOScraper:
                 data = self.extract_seo_tags(html, url, response_headers)
                 
                 # Add response time
-                response_time_status = (
-                    "✅ Fast" if response_time < 500 else
-                    "⚠️ Moderate" if response_time < 2000 else "❌ Slow"
-                )
-                data["response_time_check"] = f"{response_time_status} ({response_time:.0f}ms)"
+                if response_time < 500:
+                    data["response_time_check"] = CheckResult(
+                        status=CheckStatus.PASS,
+                        description=f"The page loads quickly with a response time of {response_time:.0f}ms, which is excellent for user experience and SEO."
+                    )
+                elif response_time < 2000:
+                    data["response_time_check"] = CheckResult(
+                        status=CheckStatus.WARNING,
+                        description=f"The page response time is {response_time:.0f}ms, which is acceptable but could be improved. Consider optimizing server response time, reducing server-side processing, or using a CDN."
+                    )
+                else:
+                    data["response_time_check"] = CheckResult(
+                        status=CheckStatus.FAIL,
+                        description=f"The page response time is {response_time:.0f}ms, which is slow and can negatively impact user experience and SEO rankings. Consider optimizing server performance, reducing server-side processing, using caching, or implementing a CDN."
+                    )
                 data["response_time_ms"] = response_time
-                
-                # Performance headers analysis
-                perf_headers = await self.analyze_performance_headers(response_headers)
-                data.update(perf_headers)
                 
                 # Resource minification check
                 minification = await self.analyze_resource_minification(page)
@@ -575,24 +773,6 @@ class SEOScraper:
                 # Count requests
                 requests_data = await self.count_requests(page)
                 data.update(requests_data)
-                
-                # Advanced SEO checks that require HTTP requests
-                robots_check = await self.check_robots_txt(url)
-                data["robots_txt_check"] = robots_check
-                
-                www_check = await self.check_www_redirect(url)
-                data["www_redirect_check"] = www_check
-                
-                # Security checks
-                directory_check = await self.check_directory_listing(url)
-                data["directory_listing_check"] = directory_check
-                
-                safe_browsing_check = await self.check_safe_browsing(url)
-                data["safe_browsing_check"] = safe_browsing_check
-                
-                # HTTPS check (already in extract_seo_tags, but ensure it's there)
-                parsed = urlparse(url)
-                data["https_ssl_check"] = "✅ HTTPS enabled" if parsed.scheme == "https" else "❌ Not using HTTPS"
                 
                 # Core Web Vitals (if API key available)
                 if self.google_cloud_api_key_3:
@@ -617,6 +797,9 @@ class SEOScraper:
 
     async def run(self, urls):
         """Run scraping process for all URLs"""
+        # Perform base URL checks once before processing all URLs
+        self.base_url_checks = await self.check_base_url(self.start_url)
+        
         queue = asyncio.Queue()
         for url in urls:
             await queue.put(url)
@@ -630,7 +813,12 @@ class SEOScraper:
             await browser.close()
 
         validated_results = [AnalyzeSiteSeoResult(**res) for res in self.results]
-        return validated_results
+        
+        # Return response with base URL checks and per-URL results
+        return AnalyzeSiteSeoResponse(
+            base_url_checks=self.base_url_checks,
+            url_results=validated_results
+        )
 
     def save_to_html(self, filename="seo_results.html"):
         """Save scraped SEO results to a styled HTML file"""
@@ -652,6 +840,11 @@ class SEOScraper:
                     color: #0f172a;
                     margin-bottom: 20px;
                 }
+                h2 {
+                    color: #1e3a8a;
+                    margin-top: 30px;
+                    margin-bottom: 15px;
+                }
                 table {
                     width: 100%;
                     border-collapse: collapse;
@@ -659,6 +852,7 @@ class SEOScraper:
                     box-shadow: 0 0 10px rgba(0,0,0,0.1);
                     border-radius: 8px;
                     overflow: hidden;
+                    margin-bottom: 30px;
                 }
                 th, td {
                     border: 1px solid #e2e8f0;
@@ -700,37 +894,72 @@ class SEOScraper:
             </style>
             """
 
-        # Build HTML table
+        # Build HTML
         html = [
             "<html><head><meta charset='UTF-8'><title>SEO Results</title>",
             style,
             "</head><body>",
         ]
         html.append("<h1>Verdant Soft – SEO Audit Results</h1>")
-        html.append("<table><thead><tr>")
+        
+        # Add base URL checks section
+        if self.base_url_checks:
+            html.append("<h2>Base URL Checks</h2>")
+            html.append("<table><thead><tr><th>Check</th><th>Status</th><th>Description</th></tr></thead><tbody>")
+            base_checks_dict = self.base_url_checks.model_dump()
+            for key, value in base_checks_dict.items():
+                if key != "base_url" and value:
+                    check_name = key.replace("_", " ").title()
+                    # Handle CheckResult object
+                    if isinstance(value, dict) and "status" in value:
+                        status = value.get("status", "UNKNOWN")
+                        description = value.get("description", "N/A")
+                        
+                        # Determine status class based on CheckStatus enum
+                        if status == "PASS":
+                            status_class = "status-ok"
+                            status_icon = "✅"
+                        elif status == "FAIL":
+                            status_class = "status-bad"
+                            status_icon = "❌"
+                        else:
+                            status_class = "status-warning"
+                            status_icon = "⚠️"
+                        
+                        cell_class = f" class='{status_class}'" if status_class else ""
+                        html.append(f"<tr><td>{check_name}</td><td{cell_class}>{status_icon} {status}</td><td>{description}</td></tr>")
+                    else:
+                        # Fallback for non-CheckResult values
+                        html.append(f"<tr><td>{check_name}</td><td>N/A</td><td>{str(value)}</td></tr>")
+            html.append("</tbody></table>")
+        
+        # Add per-URL results table
+        if self.results:
+            html.append("<h2>Per-URL Results</h2>")
+            html.append("<table><thead><tr>")
+            
+            # Add table headers
+            for header in self.results[0].keys():
+                html.append(f"<th>{header}</th>")
+            html.append("</tr></thead><tbody>")
 
-        # Add table headers
-        for header in self.results[0].keys():
-            html.append(f"<th>{header}</th>")
-        html.append("</tr></thead><tbody>")
-
-        # Add table rows
-        for row in self.results:
-            html.append("<tr>")
-            for key, value in row.items():
-                # Turn URLs into clickable links
-                if key.lower() == "url":
-                    cell = f"<a href='{value}' target='_blank'>{value}</a>"
-                # Add green/red indicators for check columns
-                elif "✅" in str(value):
-                    cell = f"<span class='status-ok'>{value}</span>"
-                elif "❌" in str(value):
-                    cell = f"<span class='status-bad'>{value}</span>"
-                else:
-                    cell = value or ""
-                html.append(f"<td>{cell}</td>")
-            html.append("</tr>")
-        html.append("</tbody></table>")
+            # Add table rows
+            for row in self.results:
+                html.append("<tr>")
+                for key, value in row.items():
+                    # Turn URLs into clickable links
+                    if key.lower() == "url":
+                        cell = f"<a href='{value}' target='_blank'>{value}</a>"
+                    # Add green/red indicators for check columns
+                    elif "✅" in str(value):
+                        cell = f"<span class='status-ok'>{value}</span>"
+                    elif "❌" in str(value):
+                        cell = f"<span class='status-bad'>{value}</span>"
+                    else:
+                        cell = value or ""
+                    html.append(f"<td>{cell}</td>")
+                html.append("</tr>")
+            html.append("</tbody></table>")
 
         # Footer with timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
