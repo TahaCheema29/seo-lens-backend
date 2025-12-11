@@ -1,4 +1,8 @@
+
 import asyncio
+import base64
+import json
+import time
 import urllib.robotparser
 from playwright.async_api import async_playwright
 from urllib.parse import urljoin, urlparse
@@ -7,6 +11,7 @@ import requests
 from lxml import etree
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 from src.config.logger_config import setup_logger
 from src.schemas.analyze_site_seo import CrawlMode
 
@@ -33,15 +38,31 @@ SITEMAP_URLS = ["/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml"]
 
 
 class SEOCrawler:
-    def __init__(self, start_url: str, crawl_mode: CrawlMode, max_workers: int = 5):
+    def __init__(
+        self,
+        start_url: str,
+        crawl_mode: CrawlMode,
+        max_workers: int = 5,
+        crawl_id: Optional[str] = None,
+        redis_client: Optional[any] = None,
+    ):
         self.start_url = str(start_url).rstrip("/")
         self.crawl_mode = crawl_mode
         self.max_workers = max_workers
+        self.crawl_id = crawl_id
+        self.redis_client = redis_client
 
         self.url_info: dict[str, URLStatus] = {}
         self.visited_links: set[str] = set()
         self.queue: asyncio.Queue | None = None
         self.lock: asyncio.Lock | None = None
+        self.frame_count = 0
+
+        # Frame sequencing for ordered publishing
+        self.frame_queue: asyncio.Queue | None = None
+        self.frame_sequence = 0
+        self.next_expected = 0
+        self.sequencer_running = False
 
         self.logger = setup_logger(__name__)
 
@@ -189,6 +210,16 @@ class SEOCrawler:
 
         return urls
 
+    async def publish_message(self, message: dict):
+        """Helper to publish messages to Redis."""
+        if self.redis_client and self.crawl_id:
+            try:
+                await self.redis_client.publish(
+                    f"crawl:{self.crawl_id}", json.dumps(message)
+                )
+            except Exception as e:
+                self.logger.debug(f"Error publishing message: {e}")
+
     async def crawl_page(self, page, url, disallowed_paths):
         """Visit a single page and extract internal links."""
         if url in self.visited_links:
@@ -202,23 +233,39 @@ class SEOCrawler:
             self.visited_links.add(url)
             self.url_info[url] = URLStatus.VISITED
 
+        # Broadcast navigation
+        await self.publish_message(
+            {"type": "navigate", "url": url, "timestamp": time.time()}
+        )
+
         try:
-            await page.goto(url, timeout=8000)
-            await page.wait_for_load_state("domcontentloaded")
-            await page.wait_for_timeout(1000)
+            await page.goto(url, timeout=30000, wait_until="domcontentloaded")
             print(f"🌍 Visiting: {url}")
         except Exception as e:
             self.url_info[url] = URLStatus.ERROR
             print(f"⚠️ Failed to load {url}: {e}")
+            await self.publish_message(
+                {"type": "error", "url": url, "error": str(e)}
+            )
             return
+
+        # Take screenshot
+        try:
+            screenshot = await page.screenshot(full_page=False)
+            b64 = base64.b64encode(screenshot).decode()
+        except Exception as e:
+            print(f"⚠️ Failed to take screenshot for {url}: {e}")
+            b64 = ""
 
         html = await page.content()
         links = self.extract_links(html, self.start_url)
 
+        new_links = []
         for link in links:
             if link not in self.url_info:
                 if self.is_allowed(link, disallowed_paths):
                     self.url_info[link] = URLStatus.DISCOVERED
+                    new_links.append(link)
                     async with self.lock:
                         try:
                             await self.queue.put(link)
@@ -226,6 +273,75 @@ class SEOCrawler:
                             pass
                 else:
                     self.url_info[link] = URLStatus.BLOCKED
+
+        # Queue frame with screenshot for ordered publishing
+        if self.frame_queue is not None:
+            async with self.lock:
+                current_sequence = self.frame_sequence
+                self.frame_sequence += 1
+                self.frame_count += 1
+
+            await self.frame_queue.put(
+                {
+                    "sequence": current_sequence,
+                    "data": {
+                        "type": "frame",
+                        "screenshot": f"data:image/png;base64,{b64}" if b64 else "",
+                        "url": page.url,
+                        "links_found": len(links),
+                        "new_links": len(new_links),
+                        "visited": len(self.visited_links),
+                        "frame": self.frame_count,
+                    },
+                }
+            )
+
+        await asyncio.sleep(0.5)  # 2 FPS
+
+    async def frame_sequencer(self):
+        """Publish frames in sequential order, handling out-of-order completion."""
+        pending = {}  # Dict to hold out-of-order frames: {sequence: frame_data}
+        
+        while self.sequencer_running or not self.frame_queue.empty():
+            try:
+                # Wait for frame with timeout to check if sequencer should stop
+                try:
+                    item = await asyncio.wait_for(self.frame_queue.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    # Check if we should continue
+                    if not self.sequencer_running and self.frame_queue.empty():
+                        break
+                    continue
+                
+                seq = item["sequence"]
+                data = item["data"]
+                
+                if seq == self.next_expected:
+                    # Publish this frame immediately
+                    await self.publish_message(data)
+                    self.next_expected += 1
+                    
+                    # Check if we can publish any pending frames
+                    while self.next_expected in pending:
+                        await self.publish_message(pending.pop(self.next_expected))
+                        self.next_expected += 1
+                else:
+                    # Store for later (out-of-order frame)
+                    pending[seq] = data
+                
+                self.frame_queue.task_done()
+            except Exception as e:
+                self.logger.error(f"Error in frame sequencer: {e}")
+                continue
+        
+        # Publish any remaining pending frames
+        while pending:
+            if self.next_expected in pending:
+                await self.publish_message(pending.pop(self.next_expected))
+                self.next_expected += 1
+            else:
+                # Skip missing sequences
+                self.next_expected += 1
 
     async def worker(self, browser, worker_id, disallowed_paths):
         page = await browser.new_page()
@@ -255,7 +371,11 @@ class SEOCrawler:
         print("crawl mode is ", self.crawl_mode)
         if self.crawl_mode == CrawlMode.FULL_CRAWL:
             self.queue = asyncio.Queue(maxsize=5000)
+            self.frame_queue = asyncio.Queue() if self.crawl_id else None
             self.lock = asyncio.Lock()
+            self.sequencer_running = True if self.crawl_id else False
+            self.frame_sequence = 0
+            self.next_expected = 0
 
             for url in all_urls:
                 if self.is_allowed(url, disallowed_paths):
@@ -272,11 +392,26 @@ class SEOCrawler:
 
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
+                
+                # Start frame sequencer task if live preview is enabled
+                sequencer_task = None
+                if self.frame_queue is not None:
+                    sequencer_task = asyncio.create_task(self.frame_sequencer())
+                
+                # Start worker tasks
                 tasks = [
                     self.worker(browser, i, disallowed_paths)
                     for i in range(self.max_workers)
                 ]
+                
+                # Wait for all workers to finish
                 await asyncio.gather(*tasks)
+                
+                # Stop sequencer and wait for it to finish processing remaining frames
+                if sequencer_task is not None:
+                    self.sequencer_running = False
+                    await sequencer_task
+                
                 await browser.close()
 
         crawl_end_time = datetime.now()
@@ -290,6 +425,14 @@ class SEOCrawler:
         print(f"Ended at: {crawl_end_time}")
         print(f"Duration: {duration}")
 
+        # Publish completion message
+        await self.publish_message(
+            {
+                "type": "complete",
+                "total_visited": len(self.visited_links),
+            }
+        )
+
         return self.url_info if self.crawl_mode == CrawlMode.FULL_CRAWL else all_urls
 
 
@@ -300,3 +443,4 @@ class SEOCrawler:
 #         max_workers=5
 #     )
 #     asyncio.run(crawler.run())
+

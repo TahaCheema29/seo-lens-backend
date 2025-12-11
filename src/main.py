@@ -3,8 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pathlib import Path
 from src.config.settings import settings
+from src.config.redis_client import ensure_redis_connection
 import src.routers.seo_tools as seo_tools
+import logging
 
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="SEO Lens",
@@ -21,6 +24,13 @@ app.add_middleware(
 )
 
 app.include_router(seo_tools.router)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Verify Redis connection on startup"""
+    logger.info("Starting up...")
+    await ensure_redis_connection()
 
 
 @app.get("/")

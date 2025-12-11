@@ -792,7 +792,6 @@ class SEOScraper:
                 queue.task_done()
 
         await page.close()
-        print("result is ", self.results)
         print(f"✅ Worker {worker_id} finished")
 
     async def run(self, urls):

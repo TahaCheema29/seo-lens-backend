@@ -12,7 +12,9 @@ services:
     volumes:
       - .:/app
     ports:
-      - "8000:8000"   # ✅ exposes FastAPI
+      - "8000:8000"
+    networks:
+      - seo_net
     command: >
       sh -c "playwright install chromium && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/src"
 
@@ -23,14 +25,15 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    restart: always
     env_file:
       - .env.local
-    command: [
-      "redis-server",
-      "--appendonly", "yes",
-      "--requirepass", "${REDIS_PASSWORD}"
-    ]
+    networks:
+      - seo_net
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "mysecretpassword"]
+
 
 volumes:
   redis_data:
+
+networks:
+  seo_net:
