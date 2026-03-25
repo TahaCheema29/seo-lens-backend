@@ -6,6 +6,7 @@ from src.schemas.suggest_keywords import SuggestKeywordRequest
 from src.schemas.analyze_site_seo import AnalyzeSiteSeoRequest, AnalyzeSiteSeoResult
 from src.utils.seo_crawler import SEOCrawler
 from src.utils.seo_scraper import SEOScraper
+from src.auth.repository.report_repository import create_report
 
 
 class SeoToolsService:
@@ -21,6 +22,11 @@ class SeoToolsService:
         )
 
         print(results)
+        for item in results:
+            await create_report(
+                report_type="analyze_keyword_rank",
+                report=item.model_dump(mode="json"),
+            )
         return results
     
 
@@ -29,6 +35,11 @@ class SeoToolsService:
         researcher = KeywordResearch(headless=True)
         print("Starting keyword rank checking...")
         results = await researcher.run(user_input.keywords)
+        for item in results:
+            await create_report(
+                report_type="suggest_keywords",
+                report=item.model_dump(mode="json"),
+            )
         return results
     
 
@@ -47,4 +58,9 @@ class SeoToolsService:
         scraper.save_to_html()
 
         print(f"Done in {time.perf_counter() - start_time:.2f}s — {len(results)} pages analyzed")
+        for item in results:
+            await create_report(
+                report_type="analyze_site_seo",
+                report=item.model_dump(mode="json"),
+            )
         return results

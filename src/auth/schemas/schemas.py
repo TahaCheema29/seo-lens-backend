@@ -1,3 +1,5 @@
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -15,4 +17,14 @@ class LoginRequest(BaseModel):
 class AuthTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class CreateReportRequest(BaseModel):
+    report_type: str = Field(min_length=1, max_length=100)
+    report: Dict[str, Any]
+
+
+class UpdateReportRequest(BaseModel):
+    report: Dict[str, Any]
+    report_type: Optional[str] = Field(default=None, min_length=1, max_length=100)
 
