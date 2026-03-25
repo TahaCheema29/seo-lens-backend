@@ -613,8 +613,7 @@ async def main():
     
     # Example keywords to research
     keywords = [
-        
-        "content marketing"
+        "butterfly"
     ]
     
     print("Starting keyword research...")

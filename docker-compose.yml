@@ -1,39 +1,9 @@
-<<<<<<< HEAD
-=======
-version: "3.9"
-
->>>>>>> 43d941915cb4c47697e1f2b55cb910336a663044
 services:
   seo-lens:
     build: 
       context: .
       dockerfile: Dockerfile
     container_name: seo-lens
-<<<<<<< HEAD
-    volumes:
-      - .:/app
-    tty: true
-  
-  keyword-rank-checker:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    container_name: keyword-rank-checker
-    volumes:
-      - .:/app
-    command: python keyword_rank_checker.py
-    tty: true
-  
-  keyword-research:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    container_name: keyword-research
-    volumes:
-      - .:/app
-    command: python keyword_research.py
-    tty: true
-=======
     restart: always
     depends_on:
       - redis
@@ -42,7 +12,7 @@ services:
     volumes:
       - .:/app
     ports:
-      - "8000:8000"   # ✅ exposes FastAPI
+      - "8000:8000"
     command: >
       sh -c "playwright install chromium && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/src"
 
@@ -64,4 +34,3 @@ services:
 
 volumes:
   redis_data:
->>>>>>> 43d941915cb4c47697e1f2b55cb910336a663044
