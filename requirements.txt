@@ -9,3 +9,8 @@ pydantic-settings==2.11.0
 redis==6.4.0
 fastapi==0.119.1
 uvicorn[standard]==0.38.0
+asyncpg
+passlib[bcrypt]
+python-jose[cryptography]
+email-validator
+bcrypt==3.2.2
