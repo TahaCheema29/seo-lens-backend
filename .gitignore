@@ -1,2 +1,7 @@
 app.log
 *__pycache__
+#output file
+seo_results.csv
+seo_results.html
+*.json
+.env.local
