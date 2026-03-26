@@ -21,14 +21,13 @@ class KeywordResearch:
     async def search_google_cse(self, keyword: str, max_results: int = 10) -> List[Dict]:
         """Search using Google Custom Search Engine API - most reliable method"""
         try:
-            # Google Custom Search API endpoint
             api_url = "https://www.googleapis.com/customsearch/v1"
             
             params = {
                 'key': settings.google_cloud_api_key_3,
                 'cx': settings.google_cloud_cse,
                 'q': keyword,
-                'num': min(max_results, 10),  # Google CSE API limits to 10 results per request
+                'num': min(max_results, 10),
                 'safe': 'off',
                 'fields': 'items(title,link,snippet)'
             }
@@ -70,7 +69,6 @@ class KeywordResearch:
     async def get_related_searches(self, page, keyword: str) -> List[str]:
         """Get related search terms from Google's 'Searches related to' section"""
         try:
-            # Construct Google search URL
             search_url = f"https://www.google.com/search?q={quote_plus(keyword)}"
 
             logger.info(f"Getting related searches for: {keyword}")
@@ -78,13 +76,11 @@ class KeywordResearch:
             await page.wait_for_load_state("domcontentloaded")
             await page.wait_for_timeout(2000)
 
-            # Get page content
             html = await page.content()
             soup = BeautifulSoup(html, "html.parser")
 
             related_searches = []
 
-            # Method 1: Find "Searches related to" section with various selectors
             related_selectors = [
                 'div[aria-label="Searches related to"]',
                 "div.brs_col",
@@ -103,14 +99,12 @@ class KeywordResearch:
                             and related_text != keyword
                             and len(related_text) > 2
                             and len(related_text.split()) <= 5
-                        ):  # Reasonable length
+                        ):
                             related_searches.append(related_text)
 
-            # Method 2: Extract from search result titles and snippets
             if not related_searches:
                 search_results = soup.find_all("div", class_="g")
                 for result in search_results:
-                    # Extract from titles
                     title_elem = result.find("h3")
                     if title_elem:
                         title_text = title_elem.get_text().strip()
@@ -132,7 +126,6 @@ class KeywordResearch:
                             ):
                                 related_searches.append(word)
 
-                    # Extract from snippets
                     snippet_elem = result.find("span", class_="VuuXrf")
                     if snippet_elem:
                         snippet_text = snippet_elem.get_text().strip()
@@ -154,7 +147,6 @@ class KeywordResearch:
                             ):
                                 related_searches.append(word)
 
-            # Method 3: Generate common related terms
             if not related_searches:
                 common_related = [
                     "strategy",
@@ -172,7 +164,6 @@ class KeywordResearch:
                     related_searches.append(f"{keyword} {term}")
                     related_searches.append(f"{term} {keyword}")
 
-            # Clean and deduplicate
             cleaned_searches = []
             seen = set()
             for term in related_searches:
@@ -196,21 +187,18 @@ class KeywordResearch:
     async def get_people_also_ask(self, page, keyword: str) -> List[Dict]:
         """Get 'People also ask' questions from Google search results"""
         try:
-            # Construct Google search URL
             search_url = f"https://www.google.com/search?q={quote_plus(keyword)}"
 
             logger.info(f"Getting People Also Ask for: {keyword}")
             await page.goto(search_url, timeout=30000)
             await page.wait_for_load_state("domcontentloaded")
-            await page.wait_for_timeout(3000)  # Wait longer for dynamic content
+            await page.wait_for_timeout(3000)
 
-            # Get page content
             html = await page.content()
             soup = BeautifulSoup(html, "html.parser")
 
             paa_questions = []
 
-            # Method 1: Look for People Also Ask section with various selectors
             paa_selectors = [
                 'div[aria-label="People also ask"]',
                 "div[data-initq]",
@@ -235,11 +223,9 @@ class KeywordResearch:
                                 {"question": question_text, "keyword": keyword}
                             )
 
-            # Method 2: Look for questions in search results
             if not paa_questions:
                 question_divs = soup.find_all("div", class_="g")
                 for div in question_divs:
-                    # Look for question patterns in various elements
                     question_elements = div.find_all(
                         ["span", "div", "h3"], string=re.compile(r"\?")
                     )
@@ -255,7 +241,6 @@ class KeywordResearch:
                                 {"question": question_text, "keyword": keyword}
                             )
 
-            # Method 3: Generate some common questions based on the keyword
             if not paa_questions:
                 common_questions = [
                     f"What is {keyword}?",
@@ -267,7 +252,6 @@ class KeywordResearch:
                 for question in common_questions:
                     paa_questions.append({"question": question, "keyword": keyword})
 
-            # Remove duplicates and limit
             unique_questions = []
             seen = set()
             for q in paa_questions:
@@ -287,25 +271,21 @@ class KeywordResearch:
         try:
             logger.info(f"Getting autocomplete suggestions for: {keyword}")
 
-            # Method 1: Try to simulate typing in Google search box
             search_url = "https://www.google.com"
             await page.goto(search_url, timeout=30000)
             await page.wait_for_load_state("domcontentloaded")
             await page.wait_for_timeout(2000)
 
-            # Find the search box and type the keyword
             search_box = page.locator('input[name="q"]')
             if await search_box.count() > 0:
                 await search_box.fill(keyword)
-                await page.wait_for_timeout(1000)  # Wait for suggestions to appear
+                await page.wait_for_timeout(1000)
 
-                # Look for autocomplete suggestions
                 html = await page.content()
                 soup = BeautifulSoup(html, "html.parser")
 
                 suggestions = []
 
-                # Look for autocomplete suggestions in various containers
                 autocomplete_selectors = [
                     'div[role="presentation"]',
                     'div[jsname="aajZCb"]',
@@ -335,7 +315,6 @@ class KeywordResearch:
                     )
                     return suggestions
 
-            # Method 2: Extract from search results if typing simulation fails
             search_url = f"https://www.google.com/search?q={quote_plus(keyword)}"
             await page.goto(search_url, timeout=30000)
             await page.wait_for_load_state("domcontentloaded")
@@ -346,24 +325,20 @@ class KeywordResearch:
 
             suggestions = []
 
-            # Extract from search result titles and snippets
             search_results = soup.find_all("div", class_="g")
             for result in search_results:
-                # Extract from titles
                 title_elem = result.find("h3")
                 if title_elem:
                     title_text = title_elem.get_text().strip()
                     words = title_text.split()
                     for i, word in enumerate(words):
                         if keyword.lower() in word.lower():
-                            # Get surrounding words to form suggestions
                             start = max(0, i - 1)
                             end = min(len(words), i + 2)
                             phrase = " ".join(words[start:end])
                             if len(phrase.split()) <= 4 and phrase != keyword:
                                 suggestions.append(phrase)
 
-                # Extract from snippets
                 snippet_elem = result.find("span", class_="VuuXrf")
                 if snippet_elem:
                     snippet_text = snippet_elem.get_text().strip()
@@ -376,7 +351,6 @@ class KeywordResearch:
                             if len(phrase.split()) <= 4 and phrase != keyword:
                                 suggestions.append(phrase)
 
-            # Method 3: Generate common autocomplete suggestions
             if not suggestions:
                 common_suggestions = [
                     f"{keyword} strategy",
@@ -393,7 +367,6 @@ class KeywordResearch:
                 ]
                 suggestions = common_suggestions
 
-            # Clean and deduplicate
             cleaned_suggestions = []
             seen = set()
             for suggestion in suggestions:
@@ -418,7 +391,6 @@ class KeywordResearch:
     async def get_long_tail_keywords(self, page, keyword: str) -> List[str]:
         """Get long-tail keyword variations"""
         try:
-            # Search for the keyword and look for long-tail variations in snippets
             search_url = f"https://www.google.com/search?q={quote_plus(keyword)}"
 
             logger.info(f"Getting long-tail keywords for: {keyword}")
@@ -431,7 +403,6 @@ class KeywordResearch:
 
             long_tail_keywords = []
 
-            # Method 1: Extract from snippets with various selectors
             snippet_selectors = [
                 "span.VuuXrf",
                 "span.st",
@@ -445,20 +416,17 @@ class KeywordResearch:
                 for snippet in snippets:
                     snippet_text = snippet.get_text().strip()
                     if snippet_text and keyword.lower() in snippet_text.lower():
-                        # Extract potential long-tail variations
                         words = snippet_text.split()
                         for i, word in enumerate(words):
                             if keyword.lower() in word.lower():
-                                # Get surrounding words to form long-tail phrases
                                 start = max(0, i - 2)
                                 end = min(len(words), i + 3)
                                 phrase = " ".join(words[start:end])
                                 if (
                                     len(phrase.split()) >= 3
-                                ):  # Long-tail should be at least 3 words
+                                ):
                                     long_tail_keywords.append(phrase)
 
-            # Method 2: Extract from titles
             titles = soup.find_all(["h3", "h2", "h1"])
             for title in titles:
                 title_text = title.get_text().strip()
@@ -472,7 +440,6 @@ class KeywordResearch:
                             if len(phrase.split()) >= 2:
                                 long_tail_keywords.append(phrase)
 
-            # Method 3: Generate common long-tail variations
             if not long_tail_keywords:
                 common_modifiers = [
                     "how to",
@@ -501,7 +468,6 @@ class KeywordResearch:
                     long_tail_keywords.append(f"{modifier} {keyword}")
                     long_tail_keywords.append(f"{keyword} {modifier}")
 
-            # Clean and deduplicate
             cleaned_keywords = []
             for phrase in long_tail_keywords:
                 phrase = phrase.strip().lower()
@@ -522,7 +488,6 @@ class KeywordResearch:
     async def research_keyword(self, keyword: str) -> Dict:
         """Perform comprehensive keyword research with maximum parallelism"""
         
-        # Create tasks for all operations
         tasks = [
             self.search_google_cse(keyword, 10),
             self._get_related_searches_with_browser(keyword),
@@ -531,10 +496,8 @@ class KeywordResearch:
             self._get_long_tail_with_browser(keyword)
         ]
         
-        # Execute all tasks in parallel
         search_results, web_related_searches, paa_questions, autocomplete_suggestions, long_tail_keywords = await asyncio.gather(*tasks)
         
-        # Process results (same as before)
         related_searches = []
         if search_results:
             for result in search_results:
@@ -547,7 +510,6 @@ class KeywordResearch:
                         related_searches.append(word)
             related_searches = list(set(related_searches))[:10]
 
-        # Combine results
         all_related_searches = list(set(related_searches + web_related_searches))[:10]
 
         result = {

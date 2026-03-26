@@ -1,10 +1,8 @@
 import json
-import os
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, Query
 from urllib.parse import urlparse
 
-from src.config.redis_client import redis_client
 from src.config.settings import settings
 from src.seo_tools.seo_tools_controller import SeoToolsController
 from src.seo_tools.schemas.analyze_keyword_rank import AnalyzeKeywordRankRequest

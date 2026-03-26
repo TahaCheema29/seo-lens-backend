@@ -20,14 +20,13 @@ class KeywordRankChecker:
     async def search_google_cse(self, keyword: str, max_results: int = 100) -> List[Dict]:
         """Search using Google Custom Search Engine API - most reliable method"""
         try:
-            # Google Custom Search API endpoint
             api_url = "https://www.googleapis.com/customsearch/v1"
             
             params = {
                 'key': settings.google_cloud_api_key_3,
                 'cx': settings.google_cloud_cse,
                 'q': keyword,
-                'num': min(max_results, 10),  # Google CSE API limits to 10 results per request
+                'num': min(max_results, 10),
                 'safe': 'off',
                 'fields': 'items(title,link,snippet)'
             }
@@ -69,23 +68,18 @@ class KeywordRankChecker:
             page = await browser.new_page()
             
             try:
-                # Set user agent to avoid detection
                 await page.set_extra_http_headers({
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 })
                 
-                # Use Google Custom Search Engine API (most reliable)
                 search_results = await self.search_google_cse(keyword, max_results)
 
-                # Find target domain position if specified
                 target_position = None
                 if target_domain:
-                    # Clean target domain for better matching
                     clean_target_domain = target_domain.lower().replace('https://', '').replace('http://', '').replace('www.', '').rstrip('/')
                     
                     for result in search_results:
                         result_url = result['url'].lower()
-                        # Check multiple domain variations
                         if (clean_target_domain in result_url or 
                             result_url.endswith(clean_target_domain) or
                             f'.{clean_target_domain}' in result_url):
@@ -117,7 +111,6 @@ class KeywordRankChecker:
             page = await browser.new_page()
             
             try:
-                # Set user agent to avoid detection
                 await page.set_extra_http_headers({
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 })
@@ -127,7 +120,6 @@ class KeywordRankChecker:
                     result = await self.check_keyword_rank(keyword, target_domain, max_results)
                     self.results.append(result)
                     
-                    # Add delay between searches to avoid rate limiting
                     await asyncio.sleep(2)
                     
             finally:
@@ -140,7 +132,7 @@ class KeywordRankChecker:
         """Save results to JSON file"""
         if filename is None:
             timestamp = time.strftime('%Y%m%d_%H%M%S')
-            filename = f"keyword_rank_results_{timestamp}.json"
+            filename = f"keyword_rank_results_{filename}.json"
         
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
@@ -175,5 +167,5 @@ class KeywordRankChecker:
             else:
                 print("Position: Not found in top 100")
                 print("Status: ❌ Not ranking")
-        
+            
             print("-" * 40)

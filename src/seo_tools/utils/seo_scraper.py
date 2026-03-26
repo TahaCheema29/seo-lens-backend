@@ -31,7 +31,6 @@ class SEOScraper:
         """Extract potential keywords from text"""
         if not text:
             return []
-        # Simple keyword extraction - words longer than 3 characters
         words = re.findall(r'\b\w{4,}\b', text.lower())
         return list(set(words))
 
@@ -50,12 +49,10 @@ class SEOScraper:
         
         guidance = []
         if length < 30:
-            guidance.append("Title is too short - aim for 30-60 characters")
+            guidance.append("Title is too short - aim for30-60 characters")
         elif length > 60:
             guidance.append("Title is too long - may be truncated in search results")
         
-        # Check for click-worthiness indicators
-        has_numbers = bool(re.search(r'\d', title))
         has_power_words = bool(re.search(r'\b(best|top|ultimate|guide|how|why|free|new|proven|secret|easy|fast)\b', title.lower()))
         
         if not has_power_words:
@@ -86,7 +83,6 @@ class SEOScraper:
         elif length > 160:
             guidance.append("Description is too long - may be truncated in search results")
         
-        # Check for engagement
         has_call_to_action = bool(re.search(r'\b(buy|learn|discover|explore|get|try|start|find|read|view)\b', description.lower()))
         if not has_call_to_action:
             guidance.append("Consider adding a call-to-action to improve engagement")
@@ -103,7 +99,6 @@ class SEOScraper:
         parsed_url = urlparse(url)
         base_domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
-        # === BASIC SEO: Title & Description ===
         title = soup.title.string.strip() if soup.title and soup.title.string else ""
         title_quality = SEOScraper.check_title_quality(title)
         title_keywords = SEOScraper.extract_keywords_from_text(title)
@@ -122,7 +117,6 @@ class SEOScraper:
             .strip()
         )
 
-        # === BASIC SEO: Headings ===
         h1_tags = [h.get_text(strip=True) for h in soup.find_all("h1")]
         h2_tags = [h.get_text(strip=True) for h in soup.find_all("h2")]
         h3_tags = [h.get_text(strip=True) for h in soup.find_all("h3")]
@@ -149,7 +143,6 @@ class SEOScraper:
             "✅ Good structure" if h2_count > 0 else "⚠️ Consider adding H2 tags for better content organization"
         )
 
-        # === BASIC SEO: Images ===
         img_tags = soup.find_all("img")
         bad_alt_keywords = {"image", "photo", "picture", "img", "logo"}
         missing_or_poor_alts = [
@@ -169,7 +162,6 @@ class SEOScraper:
                 description=f"{len(missing_or_poor_alts)} out of {len(img_tags)} images are missing alt attributes or have generic alt text. Add descriptive alt text to all images for better SEO and accessibility."
             )
 
-        # === BASIC SEO: Links ===
         all_links = soup.find_all("a", href=True)
         internal_links = []
         external_links = []
@@ -198,7 +190,6 @@ class SEOScraper:
         
         links_guidance_text = "; ".join(links_guidance) if links_guidance else "Link structure looks good"
 
-        # === ADVANCED SEO: Canonical ===
         canonical_tag = soup.find("link", rel="canonical")
         canonical = (
             canonical_tag["href"].strip()
@@ -216,7 +207,6 @@ class SEOScraper:
                 description="No canonical tag was found. Adding a canonical tag helps prevent duplicate content issues and tells search engines which URL is the preferred version of the page."
             )
 
-        # === ADVANCED SEO: Noindex ===
         noindex_meta = soup.find("meta", attrs={"name": "robots"})
         noindex_header = response_headers.get("X-Robots-Tag", "") if response_headers else ""
         has_noindex = (
@@ -234,7 +224,6 @@ class SEOScraper:
                 description="The page does not have a noindex directive, so it can be indexed by search engines."
             )
 
-        # === ADVANCED SEO: Open Graph ===
         og_tags = {
             "title": soup.find("meta", attrs={"property": "og:title"}),
             "type": soup.find("meta", attrs={"property": "og:type"}),
@@ -253,7 +242,6 @@ class SEOScraper:
                 description=f"The page is missing some Open Graph tags ({', '.join(missing_og)}). Adding these tags improves how the page appears when shared on social media platforms like Facebook, Twitter, and LinkedIn."
             )
 
-        # === ADVANCED SEO: Schema ===
         schema_scripts = soup.find_all("script", type="application/ld+json")
         schema_types = []
         schema_validation = None
@@ -289,7 +277,6 @@ class SEOScraper:
                 description="The page does not contain structured data (schema.org markup). Adding structured data helps search engines better understand your content and can improve visibility in search results with rich snippets."
             )
 
-        # === PERFORMANCE: HTML Size ===
         html_size = len(html.encode('utf-8'))
         html_size_kb = html_size / 1024
         if html_size_kb < 100:
@@ -308,7 +295,6 @@ class SEOScraper:
                 description=f"The HTML document size is {html_size_kb:.1f} KB, which is very large and will significantly impact page load times. Consider optimizing by removing unnecessary code, minifying HTML, or splitting content across multiple pages."
             )
 
-        # === PERFORMANCE: Inline CSS & Whitespace ===
         inline_styles = soup.find_all(style=True)
         inline_css_count = len(inline_styles)
         whitespace_ratio = len(re.findall(r'\s{3,}', html)) / max(len(html.split('\n')), 1)
@@ -321,7 +307,6 @@ class SEOScraper:
         
         performance_guidance = "; ".join(performance_warnings) if performance_warnings else "✅ No major issues detected"
 
-        # === PERFORMANCE: Embedded Objects ===
         embedded_objects = soup.find_all(["object", "embed", "applet"])
         if not embedded_objects:
             embedded_check = CheckResult(
@@ -334,7 +319,6 @@ class SEOScraper:
                 description=f"The page contains {len(embedded_objects)} deprecated embedded objects. Consider using HTML5 alternatives (like video, audio, or iframe tags) for better compatibility and performance."
             )
 
-        # === Mobile Responsiveness ===
         viewport_tag = soup.find("meta", attrs={"name": "viewport"})
         if viewport_tag and "width=device-width" in viewport_tag.get("content", ""):
             mobile_responsiveness = CheckResult(
@@ -349,7 +333,6 @@ class SEOScraper:
 
         return {
             "url": url,
-            # Basic SEO - Title & Description
             "title": title,
             "title_length_check": CheckResult(
                 status=CheckStatus.PASS if "✅" in title_quality['status'] else (CheckStatus.FAIL if "❌" in title_quality['status'] else CheckStatus.WARNING),
@@ -371,27 +354,22 @@ class SEOScraper:
             ),
             "meta_description_quality_guidance": description_quality['guidance'],
             "meta_keywords": meta_keywords,
-            # Basic SEO - Headings
             "h1_check": h1_check,
             "h1_keyword_guidance": h1_keyword_guidance,
             "h1": h1_tags[0] if h1_tags else "",
             "h2_count": h2_count,
             "h2_optimization_guidance": h2_guidance,
-            "h2": " | ".join(h2_tags[:5]),  # Limit to first 5
+            "h2": " | ".join(h2_tags[:5]),
             "h3": " | ".join(h3_tags[:5]),
-            # Basic SEO - Images
             "image_alt_check": alt_check,
-            # Basic SEO - Links
             "internal_links_count": internal_count,
             "external_links_count": external_count,
             "links_quality_guidance": links_guidance_text,
-            # Advanced SEO
             "canonical_check": canonical_check, 
             "canonical": canonical,  
             "noindex_check": noindex_check,   
             "open_graph_check": og_check,   
             "schema_validation": schema_validation,     
-            # Performance
             "html_size_check": html_size_check,
             "html_size_bytes": html_size,
             "inline_css_warning": performance_guidance,
@@ -458,7 +436,6 @@ class SEOScraper:
             domain = parsed.netloc
             scheme = parsed.scheme
             
-            # Check if domain starts with www
             if domain.startswith("www."):
                 non_www = domain[4:]
                 test_url = f"{scheme}://{non_www}"
@@ -486,12 +463,10 @@ class SEOScraper:
     async def check_directory_listing(self, url):
         """Check if directory listing is enabled"""
         try:
-            # Try accessing a non-existent directory
             parsed = urlparse(url)
             test_url = f"{parsed.scheme}://{parsed.netloc}/nonexistent-test-directory-12345/"
             response = requests.get(test_url, timeout=5)
             
-            # If we get 200 and see directory listing indicators
             if response.status_code == 200:
                 content = response.text.lower()
                 if any(indicator in content for indicator in ["index of", "directory listing", "parent directory"]):
@@ -512,16 +487,13 @@ class SEOScraper:
 
     async def check_base_url(self, base_url: str) -> BaseUrlChecks:
         """Perform checks that should only be done on the base URL"""
-        # Convert to string if it's an HttpUrl object
         base_url_str = str(base_url) if base_url else ""
         parsed = urlparse(base_url_str)
         base_domain = f"{parsed.scheme}://{parsed.netloc}"
         
-        # Perform all base URL checks
         www_check = await self.check_www_redirect(base_domain)
         robots_check = await self.check_robots_txt(base_domain)
         
-        # HTTPS check
         if parsed.scheme == "https":
             https_check = CheckResult(
                 status=CheckStatus.PASS,
@@ -535,7 +507,6 @@ class SEOScraper:
         
         directory_check = await self.check_directory_listing(base_domain)
         
-        # Check expires headers and caching (need to make a request to base URL)
         try:
             response = requests.get(base_domain, timeout=10, allow_redirects=True)
             response_headers = response.headers
@@ -565,7 +536,6 @@ class SEOScraper:
 
     async def analyze_performance_headers(self, response_headers):
         """Analyze performance-related HTTP headers"""
-        # Check for expires headers (simplified - would ideally check image responses)
         expires_check = CheckResult(
             status=CheckStatus.WARNING,
             description="To fully verify expires headers, individual image responses need to be checked. This is a simplified check."
@@ -574,7 +544,6 @@ class SEOScraper:
         cache_control = response_headers.get("Cache-Control", "")
         expires = response_headers.get("Expires", "")
         
-        # Determine caching status
         if cache_control and "max-age" in cache_control:
             caching_advice = CheckResult(
                 status=CheckStatus.PASS,
@@ -607,7 +576,6 @@ class SEOScraper:
             js_files = []
             css_files = []
             
-            # Get all script and link tags
             scripts = await page.query_selector_all("script[src]")
             links = await page.query_selector_all("link[rel='stylesheet']")
             
@@ -621,7 +589,6 @@ class SEOScraper:
                 if href:
                     css_files.append(href)
             
-            # Check minification by filename and content
             minified_js = sum(1 for f in js_files if ".min.js" in f or "minified" in f.lower())
             minified_css = sum(1 for f in css_files if ".min.css" in f or "minified" in f.lower())
             
@@ -693,7 +660,6 @@ class SEOScraper:
     async def count_requests(self, page):
         """Count total requests (images, JS, CSS)"""
         try:
-            # This would ideally use network monitoring, but we'll estimate from DOM
             images = await page.query_selector_all("img")
             scripts = await page.query_selector_all("script[src]")
             stylesheets = await page.query_selector_all("link[rel='stylesheet']")
@@ -730,25 +696,21 @@ class SEOScraper:
             except asyncio.TimeoutError:
                 break
             try:
-                # Measure response time
                 start_time = asyncio.get_event_loop().time()
                 
                 response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
                 await page.wait_for_load_state("networkidle", timeout=10000)
                 
-                response_time = (asyncio.get_event_loop().time() - start_time) * 1000  # Convert to ms
+                response_time = (asyncio.get_event_loop().time() - start_time) * 1000
                 
-                # Get response headers
                 response_headers = {}
                 if response:
                     response_headers = response.headers
                 
                 html = await page.content()
                 
-                # Extract basic SEO data
                 data = self.extract_seo_tags(html, url, response_headers)
                 
-                # Add response time
                 if response_time < 500:
                     data["response_time_check"] = CheckResult(
                         status=CheckStatus.PASS,
@@ -766,15 +728,12 @@ class SEOScraper:
                     )
                 data["response_time_ms"] = response_time
                 
-                # Resource minification check
                 minification = await self.analyze_resource_minification(page)
                 data.update(minification)
                 
-                # Count requests
                 requests_data = await self.count_requests(page)
                 data.update(requests_data)
                 
-                # Core Web Vitals (if API key available)
                 if self.google_cloud_api_key_3:
                     print("checking web vitals")
                     vitals = await self.check_core_web_vitals(url)
@@ -796,7 +755,6 @@ class SEOScraper:
 
     async def run(self, urls):
         """Run scraping process for all URLs"""
-        # Perform base URL checks once before processing all URLs
         self.base_url_checks = await self.check_base_url(self.start_url)
         
         queue = asyncio.Queue()
@@ -813,7 +771,6 @@ class SEOScraper:
 
         validated_results = [AnalyzeSiteSeoResult(**res) for res in self.results]
         
-        # Return response with base URL checks and per-URL results
         return AnalyzeSiteSeoResponse(
             base_url_checks=self.base_url_checks,
             url_results=validated_results
@@ -825,7 +782,6 @@ class SEOScraper:
             print("⚠️ No results to save")
             return
 
-        # Define CSS styling
         style = """
             <style>
                 body {
@@ -893,7 +849,6 @@ class SEOScraper:
             </style>
             """
 
-        # Build HTML
         html = [
             "<html><head><meta charset='UTF-8'><title>SEO Results</title>",
             style,
@@ -901,7 +856,6 @@ class SEOScraper:
         ]
         html.append("<h1>Verdant Soft – SEO Audit Results</h1>")
         
-        # Add base URL checks section
         if self.base_url_checks:
             html.append("<h2>Base URL Checks</h2>")
             html.append("<table><thead><tr><th>Check</th><th>Status</th><th>Description</th></tr></thead><tbody>")
@@ -909,12 +863,10 @@ class SEOScraper:
             for key, value in base_checks_dict.items():
                 if key != "base_url" and value:
                     check_name = key.replace("_", " ").title()
-                    # Handle CheckResult object
                     if isinstance(value, dict) and "status" in value:
                         status = value.get("status", "UNKNOWN")
                         description = value.get("description", "N/A")
                         
-                        # Determine status class based on CheckStatus enum
                         if status == "PASS":
                             status_class = "status-ok"
                             status_icon = "✅"
@@ -928,28 +880,22 @@ class SEOScraper:
                         cell_class = f" class='{status_class}'" if status_class else ""
                         html.append(f"<tr><td>{check_name}</td><td{cell_class}>{status_icon} {status}</td><td>{description}</td></tr>")
                     else:
-                        # Fallback for non-CheckResult values
                         html.append(f"<tr><td>{check_name}</td><td>N/A</td><td>{str(value)}</td></tr>")
             html.append("</tbody></table>")
         
-        # Add per-URL results table
         if self.results:
             html.append("<h2>Per-URL Results</h2>")
             html.append("<table><thead><tr>")
             
-            # Add table headers
             for header in self.results[0].keys():
                 html.append(f"<th>{header}</th>")
             html.append("</tr></thead><tbody>")
 
-            # Add table rows
             for row in self.results:
                 html.append("<tr>")
                 for key, value in row.items():
-                    # Turn URLs into clickable links
                     if key.lower() == "url":
                         cell = f"<a href='{value}' target='_blank'>{value}</a>"
-                    # Add green/red indicators for check columns
                     elif "✅" in str(value):
                         cell = f"<span class='status-ok'>{value}</span>"
                     elif "❌" in str(value):
@@ -960,12 +906,10 @@ class SEOScraper:
                 html.append("</tr>")
             html.append("</tbody></table>")
 
-        # Footer with timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         html.append(f"<footer>Generated on {timestamp}</footer>")
         html.append("</body></html>")
 
-        # Write HTML file
         with open(filename, "w", encoding="utf-8") as f:
             f.write("".join(html))
 

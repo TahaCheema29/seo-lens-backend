@@ -1,4 +1,3 @@
-
 import asyncio
 import base64
 import json
@@ -58,7 +57,6 @@ class SEOCrawler:
         self.lock: asyncio.Lock | None = None
         self.frame_count = 0
 
-        # Frame sequencing for ordered publishing
         self.frame_queue: asyncio.Queue | None = None
         self.frame_sequence = 0
         self.next_expected = 0
@@ -138,7 +136,6 @@ class SEOCrawler:
         except requests.RequestException:
             pass
 
-        # Try default paths if no sitemap found
         if not sitemaps:
             for path in SITEMAP_URLS:
                 test_url = f"{base_url.rstrip('/')}{path}"
@@ -191,11 +188,9 @@ class SEOCrawler:
                 )
                 ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
 
-                # Extract URLs
                 for loc in root.xpath("//sm:url/sm:loc/text()", namespaces=ns):
                     urls.append(loc.strip())
 
-                # Nested sitemaps
                 for sub_sitemap in root.xpath(
                     "//sm:sitemap/sm:loc/text()", namespaces=ns
                 ):
@@ -233,7 +228,6 @@ class SEOCrawler:
             self.visited_links.add(url)
             self.url_info[url] = URLStatus.VISITED
 
-        # Broadcast navigation
         await self.publish_message(
             {"type": "navigate", "url": url, "timestamp": time.time()}
         )
@@ -249,7 +243,6 @@ class SEOCrawler:
             )
             return
 
-        # Take screenshot
         try:
             screenshot = await page.screenshot(full_page=False)
             b64 = base64.b64encode(screenshot).decode()
@@ -274,7 +267,6 @@ class SEOCrawler:
                 else:
                     self.url_info[link] = URLStatus.BLOCKED
 
-        # Queue frame with screenshot for ordered publishing
         if self.frame_queue is not None:
             async with self.lock:
                 current_sequence = self.frame_sequence
@@ -296,19 +288,17 @@ class SEOCrawler:
                 }
             )
 
-        await asyncio.sleep(0.5)  # 2 FPS
+        await asyncio.sleep(0.5)
 
     async def frame_sequencer(self):
         """Publish frames in sequential order, handling out-of-order completion."""
-        pending = {}  # Dict to hold out-of-order frames: {sequence: frame_data}
+        pending = {}
         
         while self.sequencer_running or not self.frame_queue.empty():
             try:
-                # Wait for frame with timeout to check if sequencer should stop
                 try:
                     item = await asyncio.wait_for(self.frame_queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
-                    # Check if we should continue
                     if not self.sequencer_running and self.frame_queue.empty():
                         break
                     continue
@@ -317,16 +307,13 @@ class SEOCrawler:
                 data = item["data"]
                 
                 if seq == self.next_expected:
-                    # Publish this frame immediately
                     await self.publish_message(data)
                     self.next_expected += 1
                     
-                    # Check if we can publish any pending frames
                     while self.next_expected in pending:
                         await self.publish_message(pending.pop(self.next_expected))
                         self.next_expected += 1
                 else:
-                    # Store for later (out-of-order frame)
                     pending[seq] = data
                 
                 self.frame_queue.task_done()
@@ -334,13 +321,11 @@ class SEOCrawler:
                 self.logger.error(f"Error in frame sequencer: {e}")
                 continue
         
-        # Publish any remaining pending frames
         while pending:
             if self.next_expected in pending:
                 await self.publish_message(pending.pop(self.next_expected))
                 self.next_expected += 1
             else:
-                # Skip missing sequences
                 self.next_expected += 1
 
     async def worker(self, browser, worker_id, disallowed_paths):
@@ -393,21 +378,17 @@ class SEOCrawler:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 
-                # Start frame sequencer task if live preview is enabled
                 sequencer_task = None
                 if self.frame_queue is not None:
                     sequencer_task = asyncio.create_task(self.frame_sequencer())
                 
-                # Start worker tasks
                 tasks = [
                     self.worker(browser, i, disallowed_paths)
                     for i in range(self.max_workers)
                 ]
                 
-                # Wait for all workers to finish
                 await asyncio.gather(*tasks)
                 
-                # Stop sequencer and wait for it to finish processing remaining frames
                 if sequencer_task is not None:
                     self.sequencer_running = False
                     await sequencer_task
@@ -425,7 +406,6 @@ class SEOCrawler:
         print(f"Ended at: {crawl_end_time}")
         print(f"Duration: {duration}")
 
-        # Publish completion message
         await self.publish_message(
             {
                 "type": "complete",
@@ -434,13 +414,3 @@ class SEOCrawler:
         )
 
         return self.url_info if self.crawl_mode == CrawlMode.FULL_CRAWL else all_urls
-
-
-# if __name__ == "__main__":
-#     crawler = SEOCrawler(
-#         start_url="https://cookieandkate.com/",
-#         crawl_mode=CrawlMode.SITEMAP_ONLY,
-#         max_workers=5
-#     )
-#     asyncio.run(crawler.run())
-
