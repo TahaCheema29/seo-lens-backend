@@ -1,3 +1,4 @@
+alembic==1.13.1
 beautifulsoup4==4.14.2
 requests==2.32.5
 playwright==1.50.0
@@ -12,3 +13,12 @@ redis==6.4.0
 
 fastapi==0.119.1
 uvicorn[standard]==0.38.0
+
+# Database
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+email-validator==2.1.1

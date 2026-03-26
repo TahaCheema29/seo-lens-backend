@@ -1,16 +1,20 @@
-version: "3.9"
-
 services:
-  seo-lens:
-    build: 
+  app:
+    build:
       context: .
       dockerfile: Dockerfile
-    container_name: seo-lens
+    container_name: seo-lens-app
     restart: always
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env.local
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/seo_lens
+      - REDIS_URL=redis://redis:6379
     volumes:
       - .:/app
     ports:
@@ -18,24 +22,55 @@ services:
     networks:
       - seo_net
     command: >
-      sh -c "playwright install chromium && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/src"
+      sh -c "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   redis:
-    image: redis:8.2.2
-    container_name: redis
+    image: redis:7-alpine
+    container_name: seo-lens-redis
+    restart: always
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    env_file:
-      - .env.local
     networks:
       - seo_net
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "mysecretpassword"]
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: seo-lens-postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=seo_lens
+    networks:
+      - seo_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d seo_lens"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   redis_data:
+  postgres_data:
 
 networks:
   seo_net:
+    driver: bridge
