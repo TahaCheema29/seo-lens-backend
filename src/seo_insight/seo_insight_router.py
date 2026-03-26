@@ -1,14 +1,20 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from statistics import mean
 from src.config.database import get_db
 from src.core.security import get_current_user
 from src.models.user import User
+from src.models.seo_insight import SeoInsightResult
 from src.seo_insight.repository.seo_insight_repository import SeoInsightRepository
 from src.seo_insight.seo_insight_service import SeoInsightService
 from src.seo_insight.seo_insight_controller import SeoInsightController
 from src.seo_insight.schemas.seo_insight import SeoInsightResultResponse, SeoInsightResultList
 from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoRequest
+from src.core.metrics import compute_seo_base_url_checks_metrics
+from src.core.response_helper import create_response
+from src.core.response_status import RESPONSE_STATUS_SUCCESS
 
 
 router = APIRouter(prefix="/seo-insight", tags=["SEO Insight"])
@@ -68,3 +74,70 @@ async def delete_seo_insight_result(
 ):
     """Delete an SEO insight result"""
     return await controller.delete_result(str(current_user.id), result_id)
+
+
+@router.get("/stats")
+async def seo_insight_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Aggregated stats for dashboard cards.
+    Derived from stored SEO checks in `base_url_checks`.
+    """
+    result = await db.execute(
+        select(SeoInsightResult).where(SeoInsightResult.user_id == str(current_user.id))
+    )
+    items = result.scalars().all()
+
+    if not items:
+        return create_response(
+            status=RESPONSE_STATUS_SUCCESS,
+            message="SEO insight stats retrieved successfully",
+            data={
+                "avgScore": 0,
+                "totalCritical": 0,
+                "totalWarnings": 0,
+                "completedCount": 0,
+                "processingCount": 0,
+                "failedCount": 0,
+            },
+        )
+
+    scores = []
+    total_critical = 0
+    total_warnings = 0
+
+    completed = 0
+    processing = 0
+    failed = 0
+
+    for item in items:
+        metrics = compute_seo_base_url_checks_metrics(item.base_url_checks)
+        scores.append(metrics["score"])
+        total_critical += metrics["criticalIssues"]
+        total_warnings += metrics["warnings"]
+
+        if item.status == "completed":
+            completed += 1
+        elif item.status == "processing":
+            processing += 1
+        elif item.status == "failed":
+            failed += 1
+        else:
+            completed += 1
+
+    avg_score = float(mean(scores)) if scores else 0.0
+
+    return create_response(
+        status=RESPONSE_STATUS_SUCCESS,
+        message="SEO insight stats retrieved successfully",
+        data={
+            "avgScore": avg_score,
+            "totalCritical": total_critical,
+            "totalWarnings": total_warnings,
+            "completedCount": completed,
+            "processingCount": processing,
+            "failedCount": failed,
+        },
+    )

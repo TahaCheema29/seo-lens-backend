@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
+
+from src.core.metrics import compute_keyword_suggestion_metrics, infer_result_status
 
 
 class KeywordSuggestionCreate(BaseModel):
@@ -30,10 +32,29 @@ class KeywordSuggestionResponse(BaseModel):
     total_related_terms: int
     timestamp: float
     date: str
+    status: str = "completed"
     created_at: datetime
+
+    # Computed fields (required by FE/dashboard)
+    relatedKeywordsCount: int = 0
+    longTailKeywordsCount: int = 0
+    searchResultsCount: int = 0
     
     class Config:
         from_attributes = True
+
+    @model_validator(mode="after")
+    def _compute_metrics(self) -> "KeywordSuggestionResponse":
+        counts = compute_keyword_suggestion_metrics(
+            related_searches=self.related_searches,
+            long_tail_keywords=self.long_tail_keywords,
+            search_results=self.search_results,
+        )
+        self.relatedKeywordsCount = counts["relatedKeywordsCount"]
+        self.longTailKeywordsCount = counts["longTailKeywordsCount"]
+        self.searchResultsCount = counts["searchResultsCount"]
+        self.status = infer_result_status(self.status, fallback="completed")
+        return self
 
 
 class KeywordSuggestionList(BaseModel):

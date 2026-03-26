@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
+
+from src.core.metrics import compute_keyword_rank_metrics, infer_result_status
 
 
 class KeywordRankResultCreate(BaseModel):
@@ -30,10 +32,32 @@ class KeywordRankResultResponse(BaseModel):
     search_results: List[dict]
     timestamp: float
     date: str
+    status: str = "completed"
+    
     created_at: datetime
+
+    # Computed fields (required by FE/dashboard)
+    domain: str = ""
+    top10Count: int = 0
+    notRankingCount: int = 0
+    avgPosition: Optional[float] = None
     
     class Config:
         from_attributes = True
+
+    @model_validator(mode="after")
+    def _compute_metrics(self) -> "KeywordRankResultResponse":
+        metrics = compute_keyword_rank_metrics(
+            target_url=self.target_url,
+            target_position=self.target_position,
+            search_results=self.search_results,
+        )
+        self.domain = metrics["domain"]
+        self.top10Count = metrics["top10Count"]
+        self.notRankingCount = metrics["notRankingCount"]
+        self.avgPosition = metrics["avgPosition"]
+        self.status = infer_result_status(self.status, fallback="completed")
+        return self
 
 
 class KeywordRankResultList(BaseModel):

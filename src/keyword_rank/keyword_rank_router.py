@@ -1,14 +1,19 @@
 from typing import List
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from statistics import mean
 from src.config.database import get_db
 from src.core.security import get_current_user
 from src.models.user import User
+from src.models.keyword_rank import KeywordRankResult
 from src.keyword_rank.repository.keyword_rank_repository import KeywordRankRepository
 from src.keyword_rank.keyword_rank_service import KeywordRankService
 from src.keyword_rank.keyword_rank_controller import KeywordRankController
 from src.keyword_rank.schemas.keyword_rank import KeywordRankResultResponse, KeywordRankResultList
 from src.seo_tools.schemas.analyze_keyword_rank import AnalyzeKeywordRankRequest, AnalyzeKeywordRankResult
+from src.core.response_helper import create_response
+from src.core.response_status import RESPONSE_STATUS_SUCCESS
 
 
 router = APIRouter(prefix="/keyword-rank", tags=["Keyword Rank"])
@@ -66,3 +71,60 @@ async def delete_keyword_rank_result(
 ):
     """Delete a keyword rank result"""
     return await controller.delete_result(str(current_user.id), result_id)
+
+
+@router.get("/stats")
+async def keyword_rank_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Aggregated stats for dashboard cards (keyword rank)."""
+    result = await db.execute(
+        select(KeywordRankResult).where(KeywordRankResult.user_id == str(current_user.id))
+    )
+    items = result.scalars().all()
+
+    if not items:
+        return create_response(
+            status=RESPONSE_STATUS_SUCCESS,
+            message="Keyword rank stats retrieved successfully",
+            data={
+                "totalKeywords": 0,
+                "top10Count": 0,
+                "avgPosition": 0,
+                "completedCount": 0,
+                "processingCount": 0,
+            },
+        )
+
+    completed = 0
+    processing = 0
+    top10 = 0
+    positions = []
+
+    for item in items:
+        if item.status == "completed":
+            completed += 1
+        elif item.status == "processing":
+            processing += 1
+        else:
+            completed += 1
+
+        if item.target_position is not None:
+            positions.append(item.target_position)
+            if item.target_position <= 10:
+                top10 += 1
+
+    avg_position = float(mean(positions)) if positions else 0
+
+    return create_response(
+        status=RESPONSE_STATUS_SUCCESS,
+        message="Keyword rank stats retrieved successfully",
+        data={
+            "totalKeywords": len(items),
+            "top10Count": top10,
+            "avgPosition": avg_position,
+            "completedCount": completed,
+            "processingCount": processing,
+        },
+    )
