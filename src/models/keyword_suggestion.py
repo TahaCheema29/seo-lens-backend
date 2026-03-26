@@ -21,6 +21,7 @@ class KeywordSuggestion(Base, BaseModel):
     total_related_terms = Column(Integer, nullable=False, default=0)
     timestamp = Column(Float, nullable=False)
     date = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="completed")
     
     user = relationship("User", back_populates="keyword_suggestions")
     
