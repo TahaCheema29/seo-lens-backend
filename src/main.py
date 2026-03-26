@@ -9,9 +9,11 @@ from src.seo_tools.seo_tools_router import router as seo_tools_router
 from src.auth.auth_router import router as auth_router
 from src.admin.auth.admin_auth_router import router as admin_auth_router
 from src.admin.users.users_router import router as admin_users_router
+from src.admin.analytics.analytics_router import router as admin_analytics_router
 from src.keyword_rank.keyword_rank_router import router as keyword_rank_router
 from src.keyword_suggestion.keyword_suggestion_router import router as keyword_suggestion_router
 from src.seo_insight.seo_insight_router import router as seo_insight_router
+from src.dashboard.dashboard_router import router as dashboard_router
 import logging
 
 from src.models import *
@@ -36,10 +38,12 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(admin_auth_router)
 app.include_router(admin_users_router)
+app.include_router(admin_analytics_router)
 app.include_router(seo_tools_router)
 app.include_router(keyword_rank_router)
 app.include_router(keyword_suggestion_router)
 app.include_router(seo_insight_router)
+app.include_router(dashboard_router)
 
 
 @app.on_event("startup")

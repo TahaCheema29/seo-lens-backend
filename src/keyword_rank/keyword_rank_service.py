@@ -134,3 +134,58 @@ class KeywordRankService:
                 message=f"Failed to delete result: {str(e)}",
                 data=None
             )
+    
+    async def get_stats(self, user_id: str) -> dict:
+        """Get statistics for user's keyword rankings"""
+        from src.models.keyword_rank import AnalysisStatus
+        
+        try:
+            items = await self.repo.get_by_user(user_id, skip=0, limit=1000)
+            
+            total_keywords = len(items)
+            top_10_count = 0
+            positions = []
+            
+            completed_count = 0
+            processing_count = 0
+            failed_count = 0
+            pending_count = 0
+            
+            for item in items:
+                status_value = item.status.value if hasattr(item.status, 'value') else str(item.status)
+                
+                if status_value == AnalysisStatus.COMPLETED.value:
+                    completed_count += 1
+                elif status_value == AnalysisStatus.PROCESSING.value:
+                    processing_count += 1
+                elif status_value == AnalysisStatus.FAILED.value:
+                    failed_count += 1
+                elif status_value == AnalysisStatus.PENDING.value:
+                    pending_count += 1
+                
+                if item.target_position:
+                    positions.append(item.target_position)
+                    if item.target_position <= 10:
+                        top_10_count += 1
+            
+            avg_position = sum(positions) / len(positions) if positions else 0.0
+            
+            return create_response(
+                status=RESPONSE_STATUS_SUCCESS,
+                message="Stats retrieved successfully",
+                data={
+                    "total_keywords": total_keywords,
+                    "top_10_count": top_10_count,
+                    "avg_position": round(avg_position, 2),
+                    "completed_count": completed_count,
+                    "processing_count": processing_count,
+                    "failed_count": failed_count,
+                    "pending_count": pending_count
+                }
+            )
+        except Exception as e:
+            return create_response(
+                status=RESPONSE_STATUS_ERROR,
+                message=f"Failed to get stats: {str(e)}",
+                data=None
+            )

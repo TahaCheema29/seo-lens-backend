@@ -2,7 +2,7 @@ from typing import List
 from fastapi import HTTPException, status
 from src.keyword_rank.repository.keyword_rank_repository import KeywordRankRepository
 from src.keyword_rank.keyword_rank_service import KeywordRankService
-from src.keyword_rank.schemas.keyword_rank import KeywordRankResultResponse, KeywordRankResultList
+from src.keyword_rank.schemas.keyword_rank import KeywordRankResultResponse, KeywordRankResultList, KeywordRankStatsResponse
 from src.seo_tools.schemas.analyze_keyword_rank import AnalyzeKeywordRankResult
 from src.models.keyword_rank import KeywordRankResult
 from src.core.response_status import RESPONSE_STATUS_ERROR
@@ -80,6 +80,18 @@ class KeywordRankController:
         if result["status"] == RESPONSE_STATUS_ERROR:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
+                detail=result["message"]
+            )
+        
+        return result
+    
+    async def get_stats(self, user_id: str) -> dict:
+        """Get keyword rank statistics"""
+        result = await self.service.get_stats(user_id)
+        
+        if result["status"] == RESPONSE_STATUS_ERROR:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=result["message"]
             )
         

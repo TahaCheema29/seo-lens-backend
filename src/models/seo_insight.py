@@ -1,8 +1,9 @@
-from sqlalchemy import Column, String, Integer, Float, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, ForeignKey, Enum
 from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.orm import relationship
 from src.config.database import Base
 from .base import BaseModel
+from .enums import AnalysisStatus
 
 
 class SeoInsightResult(Base, BaseModel):
@@ -18,6 +19,7 @@ class SeoInsightResult(Base, BaseModel):
     
     total_pages = Column(Integer, nullable=False, default=0)
     avg_response_time_ms = Column(Float, nullable=True)
+    status = Column(Enum(AnalysisStatus), default=AnalysisStatus.COMPLETED, nullable=False)
     
     user = relationship("User", back_populates="seo_insights")
     

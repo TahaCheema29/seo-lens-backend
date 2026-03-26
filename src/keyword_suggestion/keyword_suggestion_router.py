@@ -7,7 +7,7 @@ from src.models.user import User
 from src.keyword_suggestion.repository.keyword_suggestion_repository import KeywordSuggestionRepository
 from src.keyword_suggestion.keyword_suggestion_service import KeywordSuggestionService
 from src.keyword_suggestion.keyword_suggestion_controller import KeywordSuggestionController
-from src.keyword_suggestion.schemas.keyword_suggestion import KeywordSuggestionResponse, KeywordSuggestionList
+from src.keyword_suggestion.schemas.keyword_suggestion import KeywordSuggestionResponse, KeywordSuggestionList, KeywordSuggestionStatsResponse
 from src.seo_tools.schemas.suggest_keywords import SuggestKeywordRequest, SuggestKeywordResult
 
 
@@ -45,6 +45,15 @@ async def get_keyword_suggestions(
 ):
     """Get all keyword suggestions for the current user"""
     return await controller.get_results(str(current_user.id), skip, limit)
+
+
+@router.get("/stats", response_model=KeywordSuggestionStatsResponse)
+async def get_keyword_suggestion_stats(
+    current_user: User = Depends(get_current_user),
+    controller: KeywordSuggestionController = Depends(get_keyword_suggestion_controller)
+):
+    """Get keyword suggestion statistics for the current user"""
+    return await controller.get_stats(str(current_user.id))
 
 
 @router.get("/results/{result_id}")

@@ -4,138 +4,155 @@
 
 ## Already Implemented ✅
 
-| Module | Endpoints |
-|--------|-----------|
-| Authentication | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `PUT /auth/me`, `DELETE /auth/me` |
-| Admin Auth | `POST /admin/auth/register`, `POST /admin/auth/login`, `POST /admin/auth/logout`, `GET /admin/auth/me`, `GET /admin/auth/admins` |
-| Admin Users | `GET /admin/users`, `GET /admin/users/:id`, `PUT /admin/users/:id/activate`, `PUT /admin/users/:id/deactivate`, `PUT /admin/users/:id/role/:role`, `DELETE /admin/users/:id` |
-| Keyword Rank | `POST /keyword-rank/analyze`, `GET /keyword-rank/results`, `GET /keyword-rank/results/:id`, `DELETE /keyword-rank/results/:id` |
-| Keyword Suggestion | `POST /keyword-suggestion/analyze`, `GET /keyword-suggestion/results`, `GET /keyword-suggestion/results/:id`, `DELETE /keyword-suggestion/results/:id` |
-| SEO Insight | `POST /seo-insight/analyze`, `GET /seo-insight/results`, `GET /seo-insight/results/:id`, `DELETE /seo-insight/results/:id` |
-
----
-
-## Schema Updates Required ⚠️
-
-### `GET /seo-insight/results`
-Add computed fields:
-- `score` - calculate from `base_url_checks`
-- `criticalIssues` - count from `base_url_checks`
-- `warnings` - count from `base_url_checks`
-- `passedChecks` - count from `base_url_checks`
-- `pageCount` - rename from `total_pages`
-- `status` - add column to model (`completed`, `processing`, `failed`)
-
-### `GET /keyword-suggestion/results`
-Add computed fields:
-- `relatedKeywordsCount` - `len(related_searches)`
-- `longTailKeywordsCount` - `len(long_tail_keywords)`
-- `searchResultsCount` - `len(search_results)`
-- `status` - add column to model
-
-### `GET /keyword-rank/results`
-Add computed fields:
-- `domain` - extract from `target_url`
-- `top10Count` - count positions <= 10 from results
-- `notRankingCount` - count keywords not found
-- `avgPosition` - average position from results
-- `status` - add column to model
-
----
-
-## Remaining APIs to Implement ❌
-
-### 1. Dashboard API (1 endpoint)
-
+### Authentication APIs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/dashboard/overview` | Get dashboard KPIs and recent analyses |
+| POST | `/auth/register` | Register new user |
+| POST | `/auth/login` | User login |
+| POST | `/auth/logout` | User logout |
+| GET | `/auth/me` | Get current user |
+| PUT | `/auth/me` | Update current user |
+| DELETE | `/auth/me` | Delete current user |
 
-**Response:**
-```json
-{
-  "seoScore": 84,
-  "keywordsTracked": 2847,
-  "backlinks": 1234,
-  "organicTraffic": "45.2K",
-  "performanceChart": [...],
-  "recentAnalyses": { "seo": [...], "keywords": [...], "rank": [...] }
-}
-```
-
----
-
-### 2. SEO Insight Stats (1 endpoint)
-
+### Admin Authentication APIs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/seo-insight/stats` | Get aggregated stats for dashboard cards |
+| POST | `/admin/auth/register` | Admin registration |
+| POST | `/admin/auth/login` | Admin login |
+| POST | `/admin/auth/logout` | Admin logout |
+| GET | `/admin/auth/me` | Get current admin |
+| GET | `/admin/auth/admins` | Get all admins |
+| POST | `/admin/auth/refresh` | Refresh admin token |
 
-**Response:**
-```json
-{
-  "avgScore": 78,
-  "totalCritical": 12,
-  "totalWarnings": 45,
-  "completedCount": 8,
-  "processingCount": 2,
-  "failedCount": 1
-}
-```
-
----
-
-### 3. Keyword Suggestion Stats (1 endpoint)
-
+### Admin User Management APIs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/keyword-suggestion/stats` | Get aggregated stats for dashboard cards |
+| GET | `/admin/users` | Get all users |
+| GET | `/admin/users/:id` | Get user by ID |
+| PUT | `/admin/users/:id/activate` | Activate user |
+| PUT | `/admin/users/:id/deactivate` | Deactivate user |
+| PUT | `/admin/users/:id/role/:role` | Update user role |
+| DELETE | `/admin/users/:id` | Delete user |
 
-**Response:**
-```json
-{
-  "totalKeywords": 1250,
-  "completedCount": 10,
-  "processingCount": 2,
-  "avgRelatedKeywords": 45
-}
-```
-
----
-
-### 4. Keyword Rank Stats (1 endpoint)
-
+### Keyword Rank APIs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/keyword-rank/stats` | Get aggregated stats for dashboard cards |
+| POST | `/keyword-rank/analyze` | Analyze keyword ranking |
+| GET | `/keyword-rank/results` | Get user's results |
+| GET | `/keyword-rank/results/:id` | Get specific result |
+| DELETE | `/keyword-rank/results/:id` | Delete result |
+| GET | `/keyword-rank/stats` | Get keyword rank statistics |
 
-**Response:**
-```json
-{
-  "totalKeywords": 150,
-  "top10Count": 25,
-  "avgPosition": 12.5,
-  "completedCount": 8,
-  "processingCount": 1
-}
-```
+### Keyword Suggestion APIs
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/keyword-suggestion/analyze` | Analyze keywords |
+| GET | `/keyword-suggestion/results` | Get user's results |
+| GET | `/keyword-suggestion/results/:id` | Get specific result |
+| DELETE | `/keyword-suggestion/results/:id` | Delete result |
+| GET | `/keyword-suggestion/stats` | Get keyword suggestion statistics |
+
+### SEO Insight APIs
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/seo-insight/analyze` | Analyze site SEO |
+| GET | `/seo-insight/results` | Get user's results |
+| GET | `/seo-insight/results/:id` | Get specific result |
+| DELETE | `/seo-insight/results/:id` | Delete result |
+| GET | `/seo-insight/stats` | Get SEO insight statistics |
+
+### Dashboard APIs
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/dashboard/overview` | Get dashboard overview with KPIs |
 
 ---
+
+## Schema Updates Completed ✅
+
+### All Models Now Include:
+- `status` field with values: `pending`, `processing`, `completed`, `failed`
+
+### Response Schemas Now Include Computed Fields:
+
+**SEO Insight Response:**
+- `score` - calculated from base_url_checks
+- `critical_issues` - count from base_url_checks
+- `warnings` - count from base_url_checks
+- `passed_checks` - count from base_url_checks
+
+**Keyword Suggestion Response:**
+- `related_keywords_count` - len(related_searches)
+- `long_tail_keywords_count` - len(long_tail_keywords)
+- `search_results_count` - len(search_results)
+
+**Keyword Rank Response:**
+- `domain` - extracted from target_url
+- `top_10_count` - count of positions <= 10
+- `not_ranking_count` - count of keywords not found
+- `avg_position` - average position from results
+
+---
+
+## Recently Implemented ✅
+
+1. ✅ `GET /dashboard/overview` - Dashboard KPIs and recent analyses
+2. ✅ `GET /seo-insight/stats` - SEO insight statistics
+3. ✅ `GET /keyword-suggestion/stats` - Keyword suggestion statistics
+4. ✅ `GET /keyword-rank/stats` - Keyword rank statistics
+5. ✅ Added `status` column to all result tables
+6. ✅ Added computed fields to response schemas
+7. ✅ Admin User Management - All CRUD operations (5 endpoints)
+8. ✅ `GET /admin/overview` - Admin dashboard overview (IMPLEMENTED)
+9. ✅ `GET /admin/analytics` - Platform analytics (IMPLEMENTED)
+10. ✅ `POST /auth/refresh` - User refresh token (IMPLEMENTED)
+11. ✅ `POST /admin/auth/refresh` - Admin refresh token (IMPLEMENTED)
+
+---
+
+## Still Remaining to Implement ❌
+
+### Authentication APIs (4 endpoints)
+- ✅ `POST /auth/refresh` - Refresh token (IMPLEMENTED)
+- `POST /auth/forgot-password` - Forgot password
+- `POST /auth/reset-password` - Reset password
+- `POST /auth/verify-email` - Verify email
+
+### User Settings APIs (8 endpoints)
+- `GET /user/profile` - Get user profile
+- `PUT /user/profile` - Update profile
+- `POST /user/avatar` - Upload avatar
+- `GET /user/settings` - Get settings
+- `PUT /user/settings` - Update settings
+- `PUT /user/password` - Change password
+- `POST /user/2fa/enable` - Enable 2FA
+- `DELETE /user` - Delete account
+
+### Admin Analytics & Overview APIs (4 endpoints) 📋 REQUIRED
+- ✅ `GET /admin/overview` - Admin dashboard overview with user counts (IMPLEMENTED)
+- ✅ `GET /admin/analytics` - Platform analytics (SEO analyses, keywords, ranks totals) (IMPLEMENTED)
+- `GET /admin/analytics/export` - Export analytics data
+- `GET /admin/reports` - System reports
+
+### Admin System APIs (6 endpoints)
+- `GET /admin/settings` - Platform settings
+- `PUT /admin/settings` - Update settings
+- `GET /admin/api-keys` - API keys management
+- `POST /admin/api-keys` - Generate API key
+- `DELETE /admin/api-keys/:id` - Revoke API key
+- `GET /admin/integrations` - Get integrations
 
 ## Summary
 
-| Type | Count |
-|------|-------|
-| New Endpoints | 4 |
-| Schema Updates | 3 |
-
----
-
-## Implementation Priority
-
-1. **Add `status` column** to `seo_insights`, `keyword_suggestions`, `keyword_ranks` tables
-2. **Update response schemas** to include computed fields
-3. **Implement `/dashboard/overview`** - aggregates data from all tables
-4. **Implement `/seo-insight/stats`**
-5. **Implement `/keyword-suggestion/stats`**
-6. **Implement `/keyword-rank/stats`**
+| Category | Implemented | Remaining |
+|-----------|-------------|-----------|
+| Authentication | 6 | 4 |
+| User Settings | 0 | 8 |
+| Admin User Management | 6 | 0 |
+| Admin Analytics | 2 | 2 |
+| Admin System | 0 | 6 |
+| Keyword Rank | 5 | 0 |
+| Keyword Suggestion | 5 | 0 |
+| SEO Insight | 5 | 0 |
+| Dashboard | 1 | 0 |
+| **TOTAL** | **30** | **20** |

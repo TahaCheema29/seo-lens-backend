@@ -161,3 +161,82 @@ class SeoInsightService:
                 message=f"Failed to delete result: {str(e)}",
                 data=None
             )
+    
+    async def get_stats(self, user_id: str) -> dict:
+        """Get statistics for user's SEO insights"""
+        from src.models.seo_insight import AnalysisStatus
+        from sqlalchemy import func, select
+        
+        try:
+            items = await self.repo.get_by_user(user_id, skip=0, limit=1000)
+            
+            total_critical = 0
+            total_warnings = 0
+            total_passed = 0
+            scores = []
+            
+            completed_count = 0
+            processing_count = 0
+            failed_count = 0
+            pending_count = 0
+            
+            for item in items:
+                status_value = item.status.value if hasattr(item.status, 'value') else str(item.status)
+                
+                if status_value == AnalysisStatus.COMPLETED.value:
+                    completed_count += 1
+                elif status_value == AnalysisStatus.PROCESSING.value:
+                    processing_count += 1
+                elif status_value == AnalysisStatus.FAILED.value:
+                    failed_count += 1
+                elif status_value == AnalysisStatus.PENDING.value:
+                    pending_count += 1
+                
+                if item.base_url_checks:
+                    checks = item.base_url_checks
+                    for key, value in checks.items():
+                        if isinstance(value, bool):
+                            if value:
+                                total_passed += 1
+                            else:
+                                total_warnings += 1
+                        elif isinstance(value, dict):
+                            if value.get('passed'):
+                                total_passed += 1
+                            elif value.get('severity') == 'critical':
+                                total_critical += 1
+                            else:
+                                total_warnings += 1
+                    
+                    score = self._calculate_score(checks)
+                    scores.append(score)
+            
+            avg_score = mean(scores) if scores else 0.0
+            
+            return create_response(
+                status=RESPONSE_STATUS_SUCCESS,
+                message="Stats retrieved successfully",
+                data={
+                    "avg_score": round(avg_score, 2),
+                    "total_critical": total_critical,
+                    "total_warnings": total_warnings,
+                    "total_passed": total_passed,
+                    "completed_count": completed_count,
+                    "processing_count": processing_count,
+                    "failed_count": failed_count,
+                    "pending_count": pending_count
+                }
+            )
+        except Exception as e:
+            return create_response(
+                status=RESPONSE_STATUS_ERROR,
+                message=f"Failed to get stats: {str(e)}",
+                data=None
+            )
+    
+    def _calculate_score(self, checks: dict) -> float:
+        if not checks:
+            return 0.0
+        total = len(checks)
+        passed = sum(1 for k, v in checks.items() if v == True or (isinstance(v, dict) and v.get('passed')))
+        return (passed / total * 100) if total else 0.0

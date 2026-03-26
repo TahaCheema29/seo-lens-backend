@@ -6,7 +6,7 @@ from src.models.user import User
 from src.auth.schemas.user import UserCreate, UserLogin, UserResponse, UserUpdate, Token
 from src.auth.repository.user_repository import UserRepository
 from src.auth.auth_controller import AuthController
-from src.core.security import create_access_token
+from src.core.security import create_access_token, create_refresh_token, decode_access_token
 from src.core.response_status import RESPONSE_STATUS_SUCCESS
 from typing import Any, Dict
 
@@ -91,3 +91,42 @@ async def delete_me(
 ):
     """Delete current user account"""
     return await controller.delete_user(str(current_user.id))
+
+
+@router.post("/refresh")
+async def refresh_token(
+    response: Response,
+    current_user: User = Depends(get_current_user)
+):
+    """Refresh access token using valid JWT token"""
+    access_token = create_access_token(
+        data={"sub": str(current_user.id), "email": current_user.email}
+    )
+    refresh_token = create_refresh_token(
+        data={"sub": str(current_user.id), "email": current_user.email}
+    )
+    
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=7 * 24 * 60 * 60,
+        expires=7 * 24 * 60 * 60,
+        samesite="lax",
+        secure=False,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        max_age=30 * 24 * 60 * 60,
+        expires=30 * 24 * 60 * 60,
+        samesite="lax",
+        secure=False,
+    )
+    
+    return {
+        "status": RESPONSE_STATUS_SUCCESS,
+        "message": "Token refreshed successfully",
+        "data": {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+    }

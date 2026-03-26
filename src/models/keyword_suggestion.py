@@ -1,8 +1,9 @@
-from sqlalchemy import Column, String, Integer, Float, Text, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, Text, ForeignKey, Enum
 from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.orm import relationship
 from src.config.database import Base
 from .base import BaseModel
+from .enums import AnalysisStatus
 
 
 class KeywordSuggestion(Base, BaseModel):
@@ -21,6 +22,7 @@ class KeywordSuggestion(Base, BaseModel):
     total_related_terms = Column(Integer, nullable=False, default=0)
     timestamp = Column(Float, nullable=False)
     date = Column(Text, nullable=False)
+    status = Column(Enum(AnalysisStatus), default=AnalysisStatus.COMPLETED, nullable=False)
     
     user = relationship("User", back_populates="keyword_suggestions")
     

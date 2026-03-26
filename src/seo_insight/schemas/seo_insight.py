@@ -24,7 +24,14 @@ class SeoInsightResultResponse(BaseModel):
     url_results: List[dict]
     total_pages: int
     avg_response_time_ms: Optional[float]
+    status: str
     created_at: datetime
+    
+    # Computed fields
+    score: Optional[float] = None
+    critical_issues: Optional[int] = None
+    warnings: Optional[int] = None
+    passed_checks: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -36,9 +43,22 @@ class SeoInsightResultList(BaseModel):
     items: List[SeoInsightResultResponse]
 
 
+class SeoInsightStatsResponse(BaseModel):
+    """Schema for SEO insight statistics"""
+    avg_score: float
+    total_critical: int
+    total_warnings: int
+    total_passed: int
+    completed_count: int
+    processing_count: int
+    failed_count: int
+    pending_count: int
+
+
 class SeoInsightResultUpdate(BaseModel):
     """Schema for updating an SEO insight result"""
     target_url: Optional[str] = None
     crawl_mode: Optional[str] = None
     base_url_checks: Optional[dict] = None
     url_results: Optional[List[dict]] = None
+    status: Optional[str] = None

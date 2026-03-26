@@ -125,3 +125,59 @@ class KeywordSuggestionService:
                 message=f"Failed to delete result: {str(e)}",
                 data=None
             )
+    
+    async def get_stats(self, user_id: str) -> dict:
+        """Get statistics for user's keyword suggestions"""
+        from src.models.keyword_suggestion import AnalysisStatus
+        
+        try:
+            items = await self.repo.get_by_user(user_id, skip=0, limit=1000)
+            
+            total_keywords = len(items)
+            completed_count = 0
+            processing_count = 0
+            failed_count = 0
+            pending_count = 0
+            
+            total_related = 0
+            total_long_tail = 0
+            
+            for item in items:
+                status_value = item.status.value if hasattr(item.status, 'value') else str(item.status)
+                
+                if status_value == AnalysisStatus.COMPLETED.value:
+                    completed_count += 1
+                elif status_value == AnalysisStatus.PROCESSING.value:
+                    processing_count += 1
+                elif status_value == AnalysisStatus.FAILED.value:
+                    failed_count += 1
+                elif status_value == AnalysisStatus.PENDING.value:
+                    pending_count += 1
+                
+                if item.related_searches:
+                    total_related += len(item.related_searches)
+                if item.long_tail_keywords:
+                    total_long_tail += len(item.long_tail_keywords)
+            
+            avg_related = total_related / total_keywords if total_keywords > 0 else 0
+            avg_long_tail = total_long_tail / total_keywords if total_keywords > 0 else 0
+            
+            return create_response(
+                status=RESPONSE_STATUS_SUCCESS,
+                message="Stats retrieved successfully",
+                data={
+                    "total_keywords": total_keywords,
+                    "completed_count": completed_count,
+                    "processing_count": processing_count,
+                    "failed_count": failed_count,
+                    "pending_count": pending_count,
+                    "avg_related_keywords": round(avg_related, 2),
+                    "avg_long_tail_keywords": round(avg_long_tail, 2)
+                }
+            )
+        except Exception as e:
+            return create_response(
+                status=RESPONSE_STATUS_ERROR,
+                message=f"Failed to get stats: {str(e)}",
+                data=None
+            )

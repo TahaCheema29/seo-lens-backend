@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import HTTPException, status
 from src.seo_insight.repository.seo_insight_repository import SeoInsightRepository
 from src.seo_insight.seo_insight_service import SeoInsightService
-from src.seo_insight.schemas.seo_insight import SeoInsightResultResponse, SeoInsightResultList
+from src.seo_insight.schemas.seo_insight import SeoInsightResultResponse, SeoInsightResultList, SeoInsightStatsResponse
 from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoResponse
 from src.models.seo_insight import SeoInsightResult
 from src.core.response_status import RESPONSE_STATUS_ERROR
@@ -81,6 +81,18 @@ class SeoInsightController:
         if result["status"] == RESPONSE_STATUS_ERROR:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
+                detail=result["message"]
+            )
+        
+        return result
+    
+    async def get_stats(self, user_id: str) -> dict:
+        """Get SEO insight statistics"""
+        result = await self.service.get_stats(user_id)
+        
+        if result["status"] == RESPONSE_STATUS_ERROR:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=result["message"]
             )
         

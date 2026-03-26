@@ -7,7 +7,7 @@ from src.models.user import User
 from src.seo_insight.repository.seo_insight_repository import SeoInsightRepository
 from src.seo_insight.seo_insight_service import SeoInsightService
 from src.seo_insight.seo_insight_controller import SeoInsightController
-from src.seo_insight.schemas.seo_insight import SeoInsightResultResponse, SeoInsightResultList
+from src.seo_insight.schemas.seo_insight import SeoInsightResultResponse, SeoInsightResultList, SeoInsightStatsResponse
 from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoRequest
 
 
@@ -48,6 +48,15 @@ async def get_seo_insight_results(
 ):
     """Get all SEO insight results for the current user"""
     return await controller.get_results(str(current_user.id), skip, limit)
+
+
+@router.get("/stats", response_model=SeoInsightStatsResponse)
+async def get_seo_insight_stats(
+    current_user: User = Depends(get_current_user),
+    controller: SeoInsightController = Depends(get_seo_insight_controller)
+):
+    """Get SEO insight statistics for the current user"""
+    return await controller.get_stats(str(current_user.id))
 
 
 @router.get("/results/{result_id}")

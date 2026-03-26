@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.config.database import get_db
-from src.core.security import get_current_admin
+from src.core.security import get_current_admin, create_access_token, create_refresh_token
 from src.models.user import Admin
 from src.auth.schemas.user import AdminCreate, AdminLogin, AdminResponse, Token
 from src.admin.auth.repository.admin_repository import AdminRepository
@@ -83,3 +83,42 @@ async def get_all_admins(
 ):
     """Get all admins (Admin only)"""
     return await controller.get_all_admins(skip, limit)
+
+
+@router.post("/refresh")
+async def refresh_admin_token(
+    response: Response,
+    current_admin: Admin = Depends(get_current_admin)
+):
+    """Refresh admin access token"""
+    access_token = create_access_token(
+        data={"sub": str(current_admin.id), "email": current_admin.email, "role": "admin"}
+    )
+    refresh_token = create_refresh_token(
+        data={"sub": str(current_admin.id), "email": current_admin.email, "role": "admin"}
+    )
+    
+    response.set_cookie(
+        key="admin_access_token",
+        value=access_token,
+        httponly=True,
+        max_age=7 * 24 * 60 * 60,
+        expires=7 * 24 * 60 * 60,
+        samesite="lax",
+        secure=False,
+    )
+    response.set_cookie(
+        key="admin_refresh_token",
+        value=refresh_token,
+        httponly=True,
+        max_age=30 * 24 * 60 * 60,
+        expires=30 * 24 * 60 * 60,
+        samesite="lax",
+        secure=False,
+    )
+    
+    return {
+        "status": RESPONSE_STATUS_SUCCESS,
+        "message": "Admin token refreshed successfully",
+        "data": {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+    }

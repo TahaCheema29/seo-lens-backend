@@ -30,7 +30,13 @@ class KeywordSuggestionResponse(BaseModel):
     total_related_terms: int
     timestamp: float
     date: str
+    status: str
     created_at: datetime
+    
+    # Computed fields
+    related_keywords_count: Optional[int] = None
+    long_tail_keywords_count: Optional[int] = None
+    search_results_count: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -42,8 +48,20 @@ class KeywordSuggestionList(BaseModel):
     items: List[KeywordSuggestionResponse]
 
 
+class KeywordSuggestionStatsResponse(BaseModel):
+    """Schema for keyword suggestion statistics"""
+    total_keywords: int
+    completed_count: int
+    processing_count: int
+    failed_count: int
+    pending_count: int
+    avg_related_keywords: float
+    avg_long_tail_keywords: float
+
+
 class KeywordSuggestionUpdate(BaseModel):
     """Schema for updating a keyword suggestion"""
     primary_keyword: Optional[str] = None
     related_searches: Optional[List[str]] = None
     people_also_ask: Optional[List[dict]] = None
+    status: Optional[str] = None

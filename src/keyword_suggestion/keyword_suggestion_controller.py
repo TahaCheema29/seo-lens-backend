@@ -2,7 +2,7 @@ from typing import List
 from fastapi import HTTPException, status
 from src.keyword_suggestion.repository.keyword_suggestion_repository import KeywordSuggestionRepository
 from src.keyword_suggestion.keyword_suggestion_service import KeywordSuggestionService
-from src.keyword_suggestion.schemas.keyword_suggestion import KeywordSuggestionResponse, KeywordSuggestionList
+from src.keyword_suggestion.schemas.keyword_suggestion import KeywordSuggestionResponse, KeywordSuggestionList, KeywordSuggestionStatsResponse
 from src.seo_tools.schemas.suggest_keywords import SuggestKeywordResult
 from src.models.keyword_suggestion import KeywordSuggestion
 from src.core.response_status import RESPONSE_STATUS_ERROR
@@ -79,6 +79,18 @@ class KeywordSuggestionController:
         if result["status"] == RESPONSE_STATUS_ERROR:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
+                detail=result["message"]
+            )
+        
+        return result
+    
+    async def get_stats(self, user_id: str) -> dict:
+        """Get keyword suggestion statistics"""
+        result = await self.service.get_stats(user_id)
+        
+        if result["status"] == RESPONSE_STATUS_ERROR:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=result["message"]
             )
         

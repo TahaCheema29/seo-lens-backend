@@ -42,6 +42,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
+def create_refresh_token(data: dict) -> str:
+    """Create JWT refresh token (longer expiration)"""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=30)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    encoded_jwt = jwt.encode(
+        to_encode, 
+        settings.jwt_secret_key, 
+        algorithm=settings.jwt_algorithm
+    )
+    return encoded_jwt
+
+
 def decode_access_token(token: str) -> Optional[dict]:
     """Decode JWT access token"""
     try:
