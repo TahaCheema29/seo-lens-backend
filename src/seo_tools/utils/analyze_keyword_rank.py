@@ -6,7 +6,7 @@ from typing import List, Dict
 from playwright.async_api import async_playwright
 from src.config.logger_config import setup_logger
 from src.config.settings import settings
-from src.schemas.analyze_keyword_rank import AnalyzeKeywordRankResult
+from src.seo_tools.schemas.analyze_keyword_rank import AnalyzeKeywordRankResult
 
 
 logger = setup_logger(__name__)

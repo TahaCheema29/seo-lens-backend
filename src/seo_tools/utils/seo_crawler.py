@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 from src.config.logger_config import setup_logger
-from src.schemas.analyze_site_seo import CrawlMode
+from src.seo_tools.schemas.analyze_site_seo import CrawlMode
 
 
 class URLStatus(Enum):

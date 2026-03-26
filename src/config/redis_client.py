@@ -6,10 +6,8 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-# Parse the URL to extract components for explicit connection
 parsed = urlparse(settings.redis_url)
 
-# Create client with explicit parameters for better DNS resolution and error handling
 redis_client = redis.Redis(
     host=parsed.hostname or 'redis',
     port=parsed.port or 6379,

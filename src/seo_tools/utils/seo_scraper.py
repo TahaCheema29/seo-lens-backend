@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from src.config.redis_client import redis_client
 from src.config.settings import settings
 from src.config.logger_config import setup_logger
-from src.schemas.analyze_site_seo import AnalyzeSiteSeoResult, BaseUrlChecks, AnalyzeSiteSeoResponse, CheckResult, CheckStatus
+from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoResult, BaseUrlChecks, AnalyzeSiteSeoResponse, CheckResult, CheckStatus
 
 load_dotenv()
 logger = setup_logger(__name__)

@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 from src.config.settings import settings
 from src.config.redis_client import ensure_redis_connection
-import src.routers.seo_tools as seo_tools
+from src.seo_tools.seo_tools_router import router as seo_tools_router
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(seo_tools.router)
+app.include_router(seo_tools_router)
 
 
 @app.on_event("startup")

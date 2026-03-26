@@ -1,0 +1,1 @@
+from src.seo_tools.seo_tools_router import router

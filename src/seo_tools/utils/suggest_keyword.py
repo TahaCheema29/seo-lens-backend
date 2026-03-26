@@ -9,7 +9,7 @@ from src.config.logger_config import setup_logger
 from urllib.parse import quote_plus
 import re
 from src.config.settings import settings
-from src.schemas.suggest_keywords import SuggestKeywordResult
+from src.seo_tools.schemas.suggest_keywords import SuggestKeywordResult
 
 logger = setup_logger(__name__)
 

@@ -2,14 +2,14 @@ import json
 import os
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, Query
+from urllib.parse import urlparse
 
 from src.config.redis_client import redis_client
 from src.config.settings import settings
-from src.controllers.seo_tools import SeoToolsController
-from src.schemas.analyze_keyword_rank import AnalyzeKeywordRankRequest
-from src.schemas.suggest_keywords import SuggestKeywordRequest
-from src.schemas.analyze_site_seo import AnalyzeSiteSeoRequest
-from urllib.parse import urlparse
+from src.seo_tools.seo_tools_controller import SeoToolsController
+from src.seo_tools.schemas.analyze_keyword_rank import AnalyzeKeywordRankRequest
+from src.seo_tools.schemas.suggest_keywords import SuggestKeywordRequest
+from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoRequest
 
 
 router = APIRouter(prefix="/seo-tools", tags=["SEO Tools"])
@@ -25,7 +25,6 @@ async def analyze_keyword_rank(
     seo_tools_controller: SeoToolsController = Depends(get_seo_tools_controller),
 ):
     return await seo_tools_controller.analyze_keyword_rank(user_input)
-    # return {}
 
 
 @router.post("/suggest-keywords", status_code=status.HTTP_200_OK)
@@ -53,7 +52,6 @@ async def analyze_site_seo(
         return result
     except Exception as e:
         logger.error(f"Error in analyze-site-seo endpoint: {e}", exc_info=True)
-        # Re-raise to let FastAPI handle it with proper error response
         raise
 
 
@@ -62,12 +60,8 @@ async def websocket_crawl_preview(websocket: WebSocket, crawl_id: str):
     """WebSocket endpoint for live crawl preview streaming via Redis pub/sub"""
     await websocket.accept()
 
-    # Create a dedicated Redis connection for this WebSocket to avoid connection contention
-    # Parse the URL to extract connection parameters
     parsed = urlparse(settings.redis_url)
     
-    # Create a separate Redis client instance for WebSocket pubsub
-    # This prevents blocking the main redis_client used by crawler/scraper
     ws_redis_client = redis.Redis(
         host=parsed.hostname or 'redis',
         port=parsed.port or 6379,
@@ -79,10 +73,9 @@ async def websocket_crawl_preview(websocket: WebSocket, crawl_id: str):
         retry_on_timeout=True
     )
     
-    print("WebSocket Redis client created ",ws_redis_client)
+    print("WebSocket Redis client created ", ws_redis_client)
     pubsub = None
     try:
-        # Create pubsub from the dedicated WebSocket Redis client
         pubsub = ws_redis_client.pubsub()
         await pubsub.subscribe(f"crawl:{crawl_id}")
 

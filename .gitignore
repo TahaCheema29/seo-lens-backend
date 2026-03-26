@@ -4,4 +4,4 @@ app.log
 seo_results.csv
 seo_results.html
 *.json
-.env.*
+.env.local

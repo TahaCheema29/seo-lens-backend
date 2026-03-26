@@ -4,7 +4,7 @@ from datetime import datetime
 
 class AnalyzeKeywordRankRequest(BaseModel):
     url: HttpUrl
-    keywords:list[str]
+    keywords: list[str]
 
 class SearchResult(BaseModel):
     position: int = Field(..., description="Ranking position in Google search results")

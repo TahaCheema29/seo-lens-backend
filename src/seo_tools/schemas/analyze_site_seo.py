@@ -12,15 +12,15 @@ class CrawlMode(Enum):
 
 class CheckStatus(Enum):
     """Status of a check result"""
-    PASS = "PASS"  # ✅ Check passed
-    FAIL = "FAIL"  # ❌ Check failed
-    WARNING = "WARNING"  # ⚠️ Warning/needs attention
+    PASS = "PASS"
+    FAIL = "FAIL"
+    WARNING = "WARNING"
 
 
 class CheckResult(BaseModel, Generic[T]):
     """Structured result for a check with status and generic description"""
     status: CheckStatus
-    description: T  # Can be a string, int, dict, or any other type
+    description: T
     
     class Config:
         use_enum_values = True
@@ -45,7 +45,6 @@ class BaseUrlChecks(BaseModel):
 class AnalyzeSiteSeoResult(BaseModel):
     url: HttpUrl
     
-    # Basic SEO - Title & Description
     title: str
     title_length_check: Optional[CheckResult] = None
     title_keyword_presence: Optional[CheckResult] = None
@@ -56,7 +55,6 @@ class AnalyzeSiteSeoResult(BaseModel):
     meta_description_quality_guidance: Optional[str] = ""
     meta_keywords: Optional[str] = ""
     
-    # Basic SEO - Headings
     h1_check: Optional[CheckResult] = None
     h1_keyword_guidance: Optional[str] = ""
     h1: Optional[str] = ""
@@ -65,22 +63,18 @@ class AnalyzeSiteSeoResult(BaseModel):
     h2: Optional[str] = ""
     h3: Optional[str] = ""
     
-    # Basic SEO - Images
     image_alt_check: Optional[CheckResult] = None
     
-    # Basic SEO - Links
     internal_links_count: Optional[int] = 0
     external_links_count: Optional[int] = 0
     links_quality_guidance: Optional[str] = ""
     
-    # Advanced SEO
     canonical_check: Optional[CheckResult] = None
     canonical: Optional[str] = ""
     noindex_check: Optional[CheckResult] = None
     open_graph_check: Optional[CheckResult] = None
     schema_validation: Optional[CheckResult] = None
     
-    # Performance
     html_size_check: Optional[CheckResult] = None
     html_size_bytes: Optional[int] = 0
     response_time_check: Optional[CheckResult] = None
@@ -97,10 +91,8 @@ class AnalyzeSiteSeoResult(BaseModel):
     inline_css_warning: Optional[str] = ""
     embedded_objects_check: Optional[CheckResult] = None
     
-    # Mobile
     mobile_responsiveness: Optional[CheckResult] = None
     
-    # Core Web Vitals
     lcp: Optional[str] = "-"
     fid: Optional[str] = "-"
     cls: Optional[str] = "-"
