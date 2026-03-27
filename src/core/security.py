@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -68,6 +68,7 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> User:
@@ -78,10 +79,16 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    if credentials is None:
+    # Try to get token from Authorization header or cookies
+    token = None
+    if credentials:
+        token = credentials.credentials
+    else:
+        token = request.cookies.get("access_token")
+    
+    if token is None:
         raise credentials_exception
     
-    token = credentials.credentials
     payload = decode_access_token(token)
     
     if payload is None:
@@ -131,14 +138,21 @@ async def get_current_admin_user(
 
 
 async def get_optional_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
     """Get current user if authenticated, otherwise return None"""
-    if credentials is None:
+    # Try to get token from Authorization header or cookies
+    token = None
+    if credentials:
+        token = credentials.credentials
+    else:
+        token = request.cookies.get("access_token")
+    
+    if token is None:
         return None
     
-    token = credentials.credentials
     payload = decode_access_token(token)
     
     if payload is None:
@@ -155,6 +169,7 @@ async def get_optional_user(
 
 
 async def get_current_admin(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> Admin:
@@ -165,10 +180,16 @@ async def get_current_admin(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    if credentials is None:
+    # Try to get token from Authorization header or cookies
+    token = None
+    if credentials:
+        token = credentials.credentials
+    else:
+        token = request.cookies.get("admin_access_token")
+    
+    if token is None:
         raise credentials_exception
     
-    token = credentials.credentials
     payload = decode_access_token(token)
     
     if payload is None:
