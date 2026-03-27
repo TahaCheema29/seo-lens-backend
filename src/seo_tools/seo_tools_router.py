@@ -2,12 +2,15 @@ import json
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, Query
 from urllib.parse import urlparse
+from typing import Optional
 
 from src.config.settings import settings
 from src.seo_tools.seo_tools_controller import SeoToolsController
 from src.seo_tools.schemas.analyze_keyword_rank import AnalyzeKeywordRankRequest
 from src.seo_tools.schemas.suggest_keywords import SuggestKeywordRequest
 from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoRequest
+from src.core.security import get_optional_user
+from src.models.user import User
 
 
 router = APIRouter(prefix="/seo-tools", tags=["SEO Tools"])
@@ -20,32 +23,38 @@ def get_seo_tools_controller() -> SeoToolsController:
 @router.post("/analyze-rank", status_code=status.HTTP_200_OK)
 async def analyze_keyword_rank(
     user_input: AnalyzeKeywordRankRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
     seo_tools_controller: SeoToolsController = Depends(get_seo_tools_controller),
 ):
-    return await seo_tools_controller.analyze_keyword_rank(user_input)
+    user_id = str(current_user.id) if current_user else None
+    return await seo_tools_controller.analyze_keyword_rank(user_input, user_id)
 
 
 @router.post("/suggest-keywords", status_code=status.HTTP_200_OK)
 async def suggest_keywords(
     user_input: SuggestKeywordRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
     seo_tools_controller: SeoToolsController = Depends(get_seo_tools_controller),
 ):
-    return await seo_tools_controller.suggest_keywords(user_input)
+    user_id = str(current_user.id) if current_user else None
+    return await seo_tools_controller.suggest_keywords(user_input, user_id)
 
 
 @router.post("/analyze-site-seo", status_code=status.HTTP_200_OK)
 async def analyze_site_seo(
     user_input: AnalyzeSiteSeoRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
     seo_tools_controller: SeoToolsController = Depends(get_seo_tools_controller),
     crawl_id: str = Query(None, description="Crawl ID for live preview"),
 ):
     import logging
     logger = logging.getLogger(__name__)
 
-    print("analyze_site_seo called with crawl_id:", crawl_id)
+    user_id = str(current_user.id) if current_user else None
+    print("analyze_site_seo called with crawl_id:", crawl_id, "user_id:", user_id)
     try:
-        logger.info(f"Received analyze-site-seo request for {user_input.url}, crawl_id: {crawl_id}")
-        result = await seo_tools_controller.analyze_site_seo(user_input, crawl_id=crawl_id)
+        logger.info(f"Received analyze-site-seo request for {user_input.url}, crawl_id: {crawl_id}, user_id: {user_id}")
+        result = await seo_tools_controller.analyze_site_seo(user_input, user_id=user_id, crawl_id=crawl_id)
         logger.info("analyze-site-seo request completed successfully")
         return result
     except Exception as e:

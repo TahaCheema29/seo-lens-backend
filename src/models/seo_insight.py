@@ -19,6 +19,7 @@ class SeoInsightResult(Base, BaseModel):
     
     total_pages = Column(Integer, nullable=False, default=0)
     avg_response_time_ms = Column(Float, nullable=True)
+    score = Column(Integer, nullable=True)  # Overall SEO score (0-100)
     status = Column(Enum(AnalysisStatus), default=AnalysisStatus.COMPLETED, nullable=False)
     
     user = relationship("User", back_populates="seo_insights")
