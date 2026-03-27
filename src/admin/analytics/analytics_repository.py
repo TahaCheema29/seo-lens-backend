@@ -66,6 +66,69 @@ class AnalyticsRepository:
         )
         return result.scalar() or 0
     
+    async def get_seo_analyses_stats(self) -> dict:
+        """Get SEO analyses stats by status"""
+        from src.models.enums import AnalysisStatus
+        
+        total_result = await self.session.execute(
+            select(func.count()).select_from(SeoInsightResult)
+        )
+        total = total_result.scalar() or 0
+        
+        completed_result = await self.session.execute(
+            select(func.count()).where(SeoInsightResult.status == AnalysisStatus.COMPLETED)
+        )
+        completed = completed_result.scalar() or 0
+        
+        processing_result = await self.session.execute(
+            select(func.count()).where(SeoInsightResult.status == AnalysisStatus.PROCESSING)
+        )
+        processing = processing_result.scalar() or 0
+        
+        return {"total": total, "completed": completed, "processing": processing}
+    
+    async def get_keyword_research_stats(self) -> dict:
+        """Get keyword research stats by status"""
+        from src.models.enums import AnalysisStatus
+        
+        total_result = await self.session.execute(
+            select(func.count()).select_from(KeywordSuggestion)
+        )
+        total = total_result.scalar() or 0
+        
+        completed_result = await self.session.execute(
+            select(func.count()).where(KeywordSuggestion.status == AnalysisStatus.COMPLETED)
+        )
+        completed = completed_result.scalar() or 0
+        
+        processing_result = await self.session.execute(
+            select(func.count()).where(KeywordSuggestion.status == AnalysisStatus.PROCESSING)
+        )
+        processing = processing_result.scalar() or 0
+        
+        return {"total": total, "completed": completed, "processing": processing}
+    
+    async def get_rank_checks_stats(self) -> dict:
+        """Get rank checks stats by status"""
+        from src.models.enums import AnalysisStatus
+        
+        total_result = await self.session.execute(
+            select(func.count()).select_from(KeywordRankResult)
+        )
+        total = total_result.scalar() or 0
+        
+        completed_result = await self.session.execute(
+            select(func.count()).where(KeywordRankResult.status == AnalysisStatus.COMPLETED)
+        )
+        completed = completed_result.scalar() or 0
+        
+        processing_result = await self.session.execute(
+            select(func.count()).where(KeywordRankResult.status == AnalysisStatus.PROCESSING)
+        )
+        processing = processing_result.scalar() or 0
+        
+        return {"total": total, "completed": completed, "processing": processing}
+    
     async def get_user_growth_data(self) -> List[Dict[str, Any]]:
         """Get user growth data for last 6 months"""
         # For now, return mock data as we need historical aggregation
