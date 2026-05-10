@@ -3,6 +3,15 @@ from src.models.keyword_rank import KeywordRankResult
 from src.models.keyword_suggestion import KeywordSuggestion
 from src.models.seo_insight import SeoInsightResult
 from src.models.enums import AnalysisStatus
+from src.models.cicd_integration import (
+    WebhookProvider,
+    WebhookEventType,
+    WebhookEventStatus,
+    APIKey,
+    WebhookConfig,
+    WebhookEvent,
+    DeploymentAnalysis,
+)
 
 __all__ = [
     "User",
@@ -12,4 +21,11 @@ __all__ = [
     "KeywordSuggestion",
     "SeoInsightResult",
     "AnalysisStatus",
+    "WebhookProvider",
+    "WebhookEventType",
+    "WebhookEventStatus",
+    "APIKey",
+    "WebhookConfig",
+    "WebhookEvent",
+    "DeploymentAnalysis",
 ]

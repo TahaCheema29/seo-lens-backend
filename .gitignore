@@ -5,3 +5,5 @@ seo_results.csv
 seo_results.html
 *.json
 .env.local
+# Added by code-review-graph
+.code-review-graph/

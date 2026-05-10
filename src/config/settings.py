@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     )
     jwt_algorithm: str = Field(default="HS256", env="JWT_ALGORITHM")
     jwt_expiration_minutes: int = Field(default=1440, env="JWT_EXPIRATION_MINUTES")
+    
+    # Email Settings
+    email_provider: str = Field(default="console", env="EMAIL_PROVIDER")
+    sendgrid_api_key: str = Field(default="", env="SENDGRID_API_KEY")
+    sendgrid_from_email: str = Field(default="noreply@seo-lens.com", env="SENDGRID_FROM_EMAIL")
+    sendgrid_from_name: str = Field(default="SEO Lens", env="SENDGRID_FROM_NAME")
 
     class Config:
         env_file = ".env.local"

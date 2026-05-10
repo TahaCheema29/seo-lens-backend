@@ -1,7 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pathlib import Path
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from src.config.settings import settings
 from src.config.redis_client import ensure_redis_connection
 from src.config.database import init_db
@@ -14,6 +17,8 @@ from src.keyword_rank.keyword_rank_router import router as keyword_rank_router
 from src.keyword_suggestion.keyword_suggestion_router import router as keyword_suggestion_router
 from src.seo_insight.seo_insight_router import router as seo_insight_router
 from src.dashboard.dashboard_router import router as dashboard_router
+from src.webhooks.routers.webhook_router import router as webhook_router, limiter as webhook_limiter
+from src.webhooks.routers.management_router import router as cicd_management_router
 import logging
 
 from src.models import *
@@ -25,6 +30,20 @@ app = FastAPI(
     description="API for site crawling, SEO analysis, and keyword research",
     version="1.0.0",
 )
+
+# Initialize rate limiter for the entire app
+app.state.limiter = webhook_limiter
+
+# Add rate limit exception handler
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": "Rate limit exceeded. Please slow down your requests.",
+            "retry_after": "60 seconds"
+        }
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,6 +63,8 @@ app.include_router(keyword_rank_router)
 app.include_router(keyword_suggestion_router)
 app.include_router(seo_insight_router)
 app.include_router(dashboard_router)
+app.include_router(webhook_router)
+app.include_router(cicd_management_router)
 
 
 @app.on_event("startup")
