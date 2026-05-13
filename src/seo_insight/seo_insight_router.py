@@ -1,4 +1,3 @@
-from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.config.database import get_db
@@ -8,7 +7,8 @@ from src.seo_insight.repository.seo_insight_repository import SeoInsightReposito
 from src.seo_insight.seo_insight_service import SeoInsightService
 from src.seo_insight.seo_insight_controller import SeoInsightController
 from src.seo_insight.schemas.seo_insight import SeoInsightResultResponse, SeoInsightResultList, SeoInsightStatsResponse
-from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoRequest
+from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoRequest, CrawlMode
+from src.billing.access import assert_active_pro
 
 
 router = APIRouter(prefix="/seo-insight", tags=["SEO Insight"])
@@ -27,9 +27,12 @@ async def analyze_seo_insight(
     save_result: bool = Query(True, description="Whether to save result to database"),
     crawl_id: str = Query(None, description="Crawl ID for live preview"),
     current_user: User = Depends(get_current_user),
-    controller: SeoInsightController = Depends(get_seo_insight_controller)
+    db: AsyncSession = Depends(get_db),
+    controller: SeoInsightController = Depends(get_seo_insight_controller),
 ):
     """Analyze site SEO and optionally save result"""
+    if request.crawl_mode == CrawlMode.FULL_CRAWL:
+        await assert_active_pro(db, current_user.id)
     return await controller.analyze_and_save(
         user_id=str(current_user.id),
         target_url=str(request.url),

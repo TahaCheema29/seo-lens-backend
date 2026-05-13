@@ -18,6 +18,7 @@ class User(Base, BaseModel):
     full_name = Column(String, nullable=True)
     role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
     
     keyword_ranks = relationship("KeywordRankResult", back_populates="user", cascade="all, delete-orphan")
     keyword_suggestions = relationship("KeywordSuggestion", back_populates="user", cascade="all, delete-orphan")
@@ -26,6 +27,13 @@ class User(Base, BaseModel):
     webhook_configs = relationship("WebhookConfig", back_populates="user", cascade="all, delete-orphan")
     deployment_analyses = relationship("DeploymentAnalysis", back_populates="user", cascade="all, delete-orphan")
 
+    subscription = relationship(
+        "UserSubscription",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    
     def __repr__(self):
         return f"<User {self.email}>"
 

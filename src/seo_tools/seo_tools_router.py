@@ -8,9 +8,12 @@ from src.config.settings import settings
 from src.seo_tools.seo_tools_controller import SeoToolsController
 from src.seo_tools.schemas.analyze_keyword_rank import AnalyzeKeywordRankRequest
 from src.seo_tools.schemas.suggest_keywords import SuggestKeywordRequest
-from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoRequest
+from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoRequest, CrawlMode
 from src.core.security import get_optional_user
 from src.models.user import User
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.config.database import get_db
+from src.billing.access import assert_active_pro_optional_user
 
 
 router = APIRouter(prefix="/seo-tools", tags=["SEO Tools"])
@@ -44,11 +47,15 @@ async def suggest_keywords(
 async def analyze_site_seo(
     user_input: AnalyzeSiteSeoRequest,
     current_user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
     seo_tools_controller: SeoToolsController = Depends(get_seo_tools_controller),
     crawl_id: str = Query(None, description="Crawl ID for live preview"),
 ):
     import logging
     logger = logging.getLogger(__name__)
+
+    if user_input.crawl_mode == CrawlMode.FULL_CRAWL:
+        await assert_active_pro_optional_user(db, current_user.id if current_user else None)
 
     user_id = str(current_user.id) if current_user else None
     print("analyze_site_seo called with crawl_id:", crawl_id, "user_id:", user_id)

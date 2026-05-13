@@ -19,6 +19,8 @@ from src.seo_insight.seo_insight_router import router as seo_insight_router
 from src.dashboard.dashboard_router import router as dashboard_router
 from src.webhooks.routers.webhook_router import router as webhook_router, limiter as webhook_limiter
 from src.webhooks.routers.management_router import router as cicd_management_router
+from src.billing.billing_router import router as billing_router
+from src.billing.stripe_webhook_router import router as stripe_webhook_router
 import logging
 
 from src.models import *
@@ -65,6 +67,8 @@ app.include_router(seo_insight_router)
 app.include_router(dashboard_router)
 app.include_router(webhook_router)
 app.include_router(cicd_management_router)
+app.include_router(billing_router)
+app.include_router(stripe_webhook_router)
 
 
 @app.on_event("startup")

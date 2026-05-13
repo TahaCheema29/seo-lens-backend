@@ -9,6 +9,7 @@ from src.keyword_rank.keyword_rank_service import KeywordRankService
 from src.keyword_rank.keyword_rank_controller import KeywordRankController
 from src.keyword_rank.schemas.keyword_rank import KeywordRankResultResponse, KeywordRankResultList, KeywordRankStatsResponse
 from src.seo_tools.schemas.analyze_keyword_rank import AnalyzeKeywordRankRequest, AnalyzeKeywordRankResult
+from src.billing.deps import require_pro_keyword_competitor
 
 
 router = APIRouter(prefix="/keyword-rank", tags=["Keyword Rank"])
@@ -26,7 +27,8 @@ async def analyze_keyword_rank(
     request: AnalyzeKeywordRankRequest,
     save_result: bool = Query(True, description="Whether to save result to database"),
     current_user: User = Depends(get_current_user),
-    controller: KeywordRankController = Depends(get_keyword_rank_controller)
+    _: None = Depends(require_pro_keyword_competitor),
+    controller: KeywordRankController = Depends(get_keyword_rank_controller),
 ):
     """Analyze keyword ranking and optionally save result"""
     return await controller.analyze_and_save(

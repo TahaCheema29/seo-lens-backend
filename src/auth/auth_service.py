@@ -1,4 +1,5 @@
 from src.auth.repository.user_repository import UserRepository
+from src.billing.subscription_repository import SubscriptionRepository
 from src.models.user import User, UserRole
 from src.core.security import get_password_hash, verify_password
 from src.core.response_helper import create_response
@@ -8,8 +9,9 @@ from src.core.response_status import RESPONSE_STATUS_SUCCESS, RESPONSE_STATUS_ER
 class AuthService:
     """Service for user authentication operations"""
     
-    def __init__(self, user_repo: UserRepository):
+    def __init__(self, user_repo: UserRepository, subscription_repo: SubscriptionRepository):
         self.user_repo = user_repo
+        self.subscription_repo = subscription_repo
     
     async def register(self, email: str, password: str, full_name: str = None) -> dict:
         """Register a new user"""
@@ -32,6 +34,7 @@ class AuthService:
         )
         
         created_user = await self.user_repo.create(user)
+        await self.subscription_repo.ensure_basic(created_user.id)
         
         return create_response(
             status=RESPONSE_STATUS_SUCCESS,
