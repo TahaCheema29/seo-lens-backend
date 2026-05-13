@@ -15,6 +15,7 @@ from src.models import User, UserRole, Admin
 from src.models.keyword_rank import KeywordRankResult
 from src.models.keyword_suggestion import KeywordSuggestion
 from src.models.seo_insight import SeoInsightResult
+from src.models.subscription import UserSubscription, StripeWebhookEvent
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

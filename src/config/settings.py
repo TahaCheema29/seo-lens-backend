@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     sendgrid_from_email: str = Field(default="noreply@seo-lens.com", env="SENDGRID_FROM_EMAIL")
     sendgrid_from_name: str = Field(default="SEO Lens", env="SENDGRID_FROM_NAME")
 
+    # Stripe (Pro subscription)
+    stripe_secret_key: str = Field(default="", env="STRIPE_SECRET_KEY")
+    stripe_webhook_secret: str = Field(default="", env="STRIPE_WEBHOOK_SECRET")
+    stripe_pro_price_id: str = Field(default="", env="STRIPE_PRO_PRICE_ID")
+    frontend_base_url: str = Field(
+        default="http://localhost:3000",
+        env="FRONTEND_BASE_URL",
+        description="Used for Stripe Checkout success/cancel redirects",
+    )
+
     class Config:
         env_file = ".env.local"
         extra = "ignore"

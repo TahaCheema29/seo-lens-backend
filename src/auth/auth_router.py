@@ -17,7 +17,8 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def get_auth_controller(db: AsyncSession = Depends(get_db)) -> AuthController:
     """Dependency to get auth controller"""
     user_repo = UserRepository(db)
-    return AuthController(user_repo)
+    subscription_repo = SubscriptionRepository(db)
+    return AuthController(user_repo, subscription_repo)
 
 
 @router.post("/register")

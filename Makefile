@@ -81,7 +81,7 @@ docker-db-reset:
 
 docker-up:
 	cp .env.docker .env.local 2>/dev/null || true
-	docker compose up -d --build
+	docker-compose up -d --build
 	@echo ""
 	@echo "✅ Services starting..."
 	@echo "   App: http://localhost:8000"
