@@ -9,6 +9,7 @@ from src.seo_tools.seo_tools_controller import SeoToolsController
 from src.seo_tools.schemas.analyze_keyword_rank import AnalyzeKeywordRankRequest
 from src.seo_tools.schemas.suggest_keywords import SuggestKeywordRequest
 from src.seo_tools.schemas.analyze_site_seo import AnalyzeSiteSeoRequest
+from src.seo_tools.schemas.competitor_analysis import CompetitorAnalysisRequest
 from src.core.security import get_optional_user
 from src.models.user import User
 
@@ -60,6 +61,21 @@ async def analyze_site_seo(
     except Exception as e:
         logger.error(f"Error in analyze-site-seo endpoint: {e}", exc_info=True)
         raise
+
+
+@router.post("/competitor-analysis", status_code=status.HTTP_202_ACCEPTED)
+async def competitor_analysis(
+    user_input: CompetitorAnalysisRequest,
+    seo_tools_controller: SeoToolsController = Depends(get_seo_tools_controller),
+):
+    return await seo_tools_controller.analyze_competitor(user_input)
+
+@router.get("/competitor-analysis/status/{job_id}", status_code=status.HTTP_200_OK)
+async def competitor_analysis_status(
+    job_id: str,
+    seo_tools_controller: SeoToolsController = Depends(get_seo_tools_controller),
+):
+    return await seo_tools_controller.get_competitor_analysis_status(job_id)
 
 
 @router.websocket("/ws/crawl/{crawl_id}")

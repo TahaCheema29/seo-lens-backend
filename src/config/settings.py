@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     # App Settings
     debug: bool = Field(default=False, env="DEBUG")
     app_name: str = Field(default="SEO Lens", env="APP_NAME")
+    # Comma-separated origins for CORS (e.g. "http://localhost:3000,https://app.example.com")
+    cors_origins: str = Field(default="", env="CORS_ORIGINS")
     
     # Google API Keys
     google_cloud_api_key_1: str = Field(default="", env="GOOGLE_CLOUD_API_KEY_1")
