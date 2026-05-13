@@ -699,7 +699,10 @@ class SEOScraper:
                 start_time = asyncio.get_event_loop().time()
                 
                 response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
-                await page.wait_for_load_state("networkidle", timeout=10000)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=12000)
+                except Exception:
+                    pass
                 
                 response_time = (asyncio.get_event_loop().time() - start_time) * 1000
                 
@@ -755,6 +758,7 @@ class SEOScraper:
 
     async def run(self, urls):
         """Run scraping process for all URLs"""
+        self.results = []
         self.base_url_checks = await self.check_base_url(self.start_url)
         
         queue = asyncio.Queue()

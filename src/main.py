@@ -45,9 +45,33 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         }
     )
 
+def _cors_allow_origins() -> list[str]:
+    """
+    Browsers reject Access-Control-Allow-Origin: * when credentials are sent.
+    allow_credentials=True requires an explicit origin echo, so we list dev URLs
+    and merge CORS_ORIGINS from the environment.
+    """
+    defaults = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ]
+    extra = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    merged: list[str] = []
+    seen: set[str] = set()
+    for origin in defaults + extra:
+        if origin not in seen:
+            seen.add(origin)
+            merged.append(origin)
+    return merged
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_allow_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
