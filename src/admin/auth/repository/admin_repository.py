@@ -17,6 +17,11 @@ class AdminRepository(BaseRepository[Admin]):
             select(Admin).where(Admin.email == email)
         )
         return result.scalar_one_or_none()
+
+    async def admin_exists(self) -> bool:
+        """Check if any admin exists in the system"""
+        result = await self.session.execute(select(Admin).limit(1))
+        return result.scalar_one_or_none() is not None
     
     async def get_all_admins(self, skip: int = 0, limit: int = 100) -> List[Admin]:
         """Get all admins with pagination"""

@@ -14,7 +14,16 @@ class AdminAuthService:
         self.admin_repo = admin_repo
     
     async def register(self, admin_data: AdminCreate) -> dict:
-        """Register a new admin"""
+        """Register a new admin - Only allows one admin in the system"""
+        # Check if any admin already exists
+        admin_exists = await self.admin_repo.admin_exists()
+        if admin_exists:
+            return create_response(
+                status=RESPONSE_STATUS_ERROR,
+                message="An admin already exists. Only one admin is allowed in the system.",
+                data=None
+            )
+
         existing_admin = await self.admin_repo.get_by_email(admin_data.email)
         if existing_admin:
             return create_response(
@@ -22,19 +31,19 @@ class AdminAuthService:
                 message="Admin email already registered",
                 data=None
             )
-        
+
         hashed_password = get_password_hash(admin_data.password)
-        
+
         admin = Admin(
             email=admin_data.email,
             hashed_password=hashed_password,
             full_name=admin_data.full_name,
             is_active=True,
-            is_super_admin=False,
+            is_super_admin=True,  # First admin is always super admin
         )
-        
+
         created_admin = await self.admin_repo.create(admin)
-        
+
         return create_response(
             status=RESPONSE_STATUS_SUCCESS,
             message="Admin registered successfully",
