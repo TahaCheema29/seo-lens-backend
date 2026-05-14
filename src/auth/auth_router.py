@@ -48,6 +48,7 @@ async def login(
         expires=7 * 24 * 60 * 60,
         samesite="none",
         secure=True,
+        path="/",
     )
 
     return {
@@ -114,6 +115,7 @@ async def refresh_token(
         expires=7 * 24 * 60 * 60,
         samesite="none",
         secure=True,
+        path="/",
     )
     response.set_cookie(
         key="refresh_token",
@@ -123,6 +125,7 @@ async def refresh_token(
         expires=30 * 24 * 60 * 60,
         samesite="none",
         secure=True,
+        path="/",
     )
     
     return {

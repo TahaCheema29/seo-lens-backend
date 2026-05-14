@@ -49,6 +49,7 @@ async def login_admin(
         expires=7 * 24 * 60 * 60,
         samesite="none",
         secure=True,
+        path="/",
     )
 
     return {
@@ -106,6 +107,7 @@ async def refresh_admin_token(
         expires=7 * 24 * 60 * 60,
         samesite="none",
         secure=True,
+        path="/",
     )
     response.set_cookie(
         key="admin_refresh_token",
@@ -115,6 +117,7 @@ async def refresh_admin_token(
         expires=30 * 24 * 60 * 60,
         samesite="none",
         secure=True,
+        path="/",
     )
 
     return {
