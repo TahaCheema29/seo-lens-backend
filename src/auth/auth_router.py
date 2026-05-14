@@ -39,17 +39,17 @@ async def login(
     result = await controller.login(user_data.email, user_data.password)
     
     access_token = result["data"]["access_token"]
-    
+
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
         max_age=7 * 24 * 60 * 60,
         expires=7 * 24 * 60 * 60,
-        samesite="lax",
-        secure=False,
+        samesite="none",
+        secure=True,
     )
-    
+
     return {
         "status": result["status"],
         "message": result["message"],
@@ -112,8 +112,8 @@ async def refresh_token(
         httponly=True,
         max_age=7 * 24 * 60 * 60,
         expires=7 * 24 * 60 * 60,
-        samesite="lax",
-        secure=False,
+        samesite="none",
+        secure=True,
     )
     response.set_cookie(
         key="refresh_token",
@@ -121,8 +121,8 @@ async def refresh_token(
         httponly=True,
         max_age=30 * 24 * 60 * 60,
         expires=30 * 24 * 60 * 60,
-        samesite="lax",
-        secure=False,
+        samesite="none",
+        secure=True,
     )
     
     return {

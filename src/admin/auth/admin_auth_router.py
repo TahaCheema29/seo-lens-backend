@@ -47,10 +47,10 @@ async def login_admin(
         httponly=True,
         max_age=7 * 24 * 60 * 60,
         expires=7 * 24 * 60 * 60,
-        samesite="lax",
-        secure=False,
+        samesite="none",
+        secure=True,
     )
-    
+
     return {
         "status": result["status"],
         "message": result["message"],
@@ -104,8 +104,8 @@ async def refresh_admin_token(
         httponly=True,
         max_age=7 * 24 * 60 * 60,
         expires=7 * 24 * 60 * 60,
-        samesite="lax",
-        secure=False,
+        samesite="none",
+        secure=True,
     )
     response.set_cookie(
         key="admin_refresh_token",
@@ -113,10 +113,10 @@ async def refresh_admin_token(
         httponly=True,
         max_age=30 * 24 * 60 * 60,
         expires=30 * 24 * 60 * 60,
-        samesite="lax",
-        secure=False,
+        samesite="none",
+        secure=True,
     )
-    
+
     return {
         "status": RESPONSE_STATUS_SUCCESS,
         "message": "Admin token refreshed successfully",
