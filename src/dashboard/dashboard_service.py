@@ -401,12 +401,21 @@ class DashboardService:
     
     async def get_ranks(self, user_id: str) -> dict:
         """Get user's rank checks"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[SECURITY] Getting ranks for user_id: {user_id}")
+        
         result = await self.db.execute(
             select(KeywordRankResult)
             .where(KeywordRankResult.user_id == user_id)
             .order_by(KeywordRankResult.created_at.desc())
         )
         ranks = result.scalars().all()
+        
+        # Debug: Log what we found
+        logger.info(f"[SECURITY] Found {len(ranks)} rank checks for user {user_id}")
+        for r in ranks[:3]:  # Log first 3
+            logger.info(f"[SECURITY] - Rank {r.id}: user_id={r.user_id}, keyword={r.keyword}")
         
         rank_checks = []
         for r in ranks:

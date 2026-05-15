@@ -1,5 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -7,12 +8,14 @@ from slowapi.errors import RateLimitExceeded
 
 from src.config.logger_config import setup_logger
 from src.config.redis_client import redis_client
+from src.config.database import get_db
 from src.webhooks.services.webhook_service import WebhookService, InvalidAPIKeyError, WebhookServiceError
 from src.webhooks.schemas.webhook_schemas import (
     TriggerAnalysisRequest,
     TriggerAnalysisResponse,
     JobStatusResponse,
 )
+from src.payments.subscription_service import SubscriptionService
 
 logger = setup_logger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
@@ -164,9 +167,39 @@ async def trigger_analysis(
         # Check API key rate limit (100/hour per key)
         await check_api_key_rate_limit(api_key)
         
-        service = WebhookService()
-        response = await service.trigger_analysis_from_action(analysis_data, api_key)
-        return response
+        # Get database session for subscription check
+        db_gen = get_db()
+        db = await db_gen.asend(None)
+        
+        try:
+            # Validate API key and get user info
+            webhook_service = WebhookService()
+            api_key_obj = await webhook_service.validate_api_key(api_key)
+            
+            # Check if user has Pro subscription
+            subscription_service = SubscriptionService(db)
+            is_pro = await subscription_service.is_pro_user(api_key_obj.user_id)
+            
+            if not is_pro:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "status": False,
+                        "message": "CI/CD auto re-analysis requires a Pro subscription",
+                        "data": {
+                            "current_tier": "standard",
+                            "required_tier": "pro",
+                            "upgrade_url": "/api/payments/subscription/checkout"
+                        }
+                    }
+                )
+            
+            service = WebhookService()
+            response = await service.trigger_analysis_from_action(analysis_data, api_key)
+            return response
+            
+        finally:
+            await db.close()
 
     except InvalidAPIKeyError as e:
         raise HTTPException(

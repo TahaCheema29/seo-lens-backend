@@ -23,6 +23,7 @@ from src.webhooks.schemas.webhook_schemas import (
     DeploymentAnalysisListResponse,
 )
 from src.core.security import get_current_user
+from src.core.subscription import require_pro_subscription
 from src.models.user import User
 from src.models.cicd_integration import APIKey, WebhookConfig, DeploymentAnalysis
 
@@ -31,7 +32,7 @@ router = APIRouter(prefix="/api/v1", tags=["CI/CD Management"])
 
 
 # API Key Management
-@router.post("/api-keys", response_model=APIKeyCreateResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/api-keys", response_model=APIKeyCreateResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_pro_subscription)])
 async def create_api_key(
     request: APIKeyCreate,
     current_user: User = Depends(get_current_user),
@@ -130,7 +131,7 @@ async def revoke_api_key(
 
 
 # Webhook Config Management
-@router.post("/webhook-configs", response_model=WebhookConfigResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/webhook-configs", response_model=WebhookConfigResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_pro_subscription)])
 async def create_webhook_config(
     request: WebhookConfigCreate,
     current_user: User = Depends(get_current_user),

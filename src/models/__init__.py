@@ -18,6 +18,11 @@ from src.models.competitor_analysis import (
     CompetitorAnalysisStatus,
     CompetitorAnalysisWinner,
 )
+from src.models.subscription import (
+    Subscription,
+    SubscriptionTier,
+    SubscriptionStatus,
+)
 
 __all__ = [
     "User",
@@ -38,4 +43,7 @@ __all__ = [
     "CompetitorAnalysisMode",
     "CompetitorAnalysisStatus",
     "CompetitorAnalysisWinner",
+    "Subscription",
+    "SubscriptionTier",
+    "SubscriptionStatus",
 ]

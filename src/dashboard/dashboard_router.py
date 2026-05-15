@@ -68,6 +68,9 @@ async def get_ranks(
     controller: DashboardController = Depends(get_dashboard_controller)
 ):
     """Get user's rank checks"""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[SECURITY] User {current_user.id} ({current_user.email}) requesting /dashboard/ranks")
     return await controller.get_ranks(str(current_user.id))
 
 

@@ -109,18 +109,12 @@ class KeywordRankService:
     async def delete(self, user_id: str, result_id: str) -> dict:
         """Delete a result"""
         try:
-            result = await self.repo.get_by_user_and_id(user_id, result_id)
-            if not result:
-                return create_response(
-                    status=RESPONSE_STATUS_ERROR,
-                    message="Result not found",
-                    data=None
-                )
-            deleted = await self.repo.delete(result_id)
+            # Use secure delete that checks ownership
+            deleted = await self.repo.delete_by_user_and_id(user_id, result_id)
             if not deleted:
                 return create_response(
                     status=RESPONSE_STATUS_ERROR,
-                    message="Failed to delete result",
+                    message="Result not found or you don't have permission to delete it",
                     data=None
                 )
             return create_response(

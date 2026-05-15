@@ -3,13 +3,15 @@ from src.models.user import User, UserRole
 from src.core.security import get_password_hash, verify_password
 from src.core.response_helper import create_response
 from src.core.response_status import RESPONSE_STATUS_SUCCESS, RESPONSE_STATUS_ERROR
+from src.payments.subscription_repository import SubscriptionRepository
 
 
 class AuthService:
     """Service for user authentication operations"""
     
-    def __init__(self, user_repo: UserRepository):
+    def __init__(self, user_repo: UserRepository, subscription_repo: SubscriptionRepository = None):
         self.user_repo = user_repo
+        self.subscription_repo = subscription_repo
     
     async def register(self, email: str, password: str, full_name: str = None) -> dict:
         """Register a new user"""
@@ -32,6 +34,16 @@ class AuthService:
         )
         
         created_user = await self.user_repo.create(user)
+        
+        # Auto-create Standard (free) subscription for new user
+        if self.subscription_repo:
+            try:
+                await self.subscription_repo.create_standard_subscription(created_user.id)
+            except Exception as e:
+                # Log error but don't fail registration if subscription creation fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to create subscription for user {created_user.id}: {e}")
         
         return create_response(
             status=RESPONSE_STATUS_SUCCESS,

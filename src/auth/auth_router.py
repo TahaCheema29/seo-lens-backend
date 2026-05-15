@@ -5,6 +5,7 @@ from src.core.security import get_current_user
 from src.models.user import User
 from src.auth.schemas.user import UserCreate, UserLogin, UserResponse, UserUpdate, Token
 from src.auth.repository.user_repository import UserRepository
+from src.payments.subscription_repository import SubscriptionRepository
 from src.auth.auth_controller import AuthController
 from src.core.security import create_access_token, create_refresh_token, decode_access_token
 from src.core.response_status import RESPONSE_STATUS_SUCCESS
@@ -17,7 +18,8 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def get_auth_controller(db: AsyncSession = Depends(get_db)) -> AuthController:
     """Dependency to get auth controller"""
     user_repo = UserRepository(db)
-    return AuthController(user_repo)
+    subscription_repo = SubscriptionRepository(db)
+    return AuthController(user_repo, subscription_repo)
 
 
 @router.post("/register")

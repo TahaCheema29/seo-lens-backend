@@ -29,3 +29,6 @@ sendgrid==6.11.0
 
 # Rate Limiting
 slowapi==0.1.9
+
+# Stripe
+stripe==12.0.0

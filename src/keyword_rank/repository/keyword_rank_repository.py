@@ -64,8 +64,17 @@ class KeywordRankRepository:
         return result.scalar_one()
     
     async def delete(self, id: str) -> bool:
-        """Delete a record by ID"""
+        """Delete a record by ID (WARNING: Does not check user ownership - use delete_by_user_and_id instead)"""
         obj = await self.get_by_id(id)
+        if obj:
+            await self.session.delete(obj)
+            await self.session.commit()
+            return True
+        return False
+    
+    async def delete_by_user_and_id(self, user_id: str, id: str) -> bool:
+        """Delete a record by user_id and ID (SECURE - checks ownership)"""
+        obj = await self.get_by_user_and_id(user_id, id)
         if obj:
             await self.session.delete(obj)
             await self.session.commit()

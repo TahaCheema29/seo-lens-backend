@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from src.auth.repository.user_repository import UserRepository
+from src.payments.subscription_repository import SubscriptionRepository
 from src.auth.auth_service import AuthService
 from src.models.user import User
 from src.auth.schemas.user import UserCreate, UserUpdate
@@ -11,8 +12,8 @@ from src.core.response_status import RESPONSE_STATUS_SUCCESS, RESPONSE_STATUS_ER
 class AuthController:
     """Controller for authentication operations"""
     
-    def __init__(self, user_repo: UserRepository):
-        self.service = AuthService(user_repo)
+    def __init__(self, user_repo: UserRepository, subscription_repo: SubscriptionRepository = None):
+        self.service = AuthService(user_repo, subscription_repo)
     
     async def register(self, user_data: UserCreate) -> dict:
         """Register a new user"""
