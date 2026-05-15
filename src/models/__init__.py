@@ -12,6 +12,12 @@ from src.models.cicd_integration import (
     WebhookEvent,
     DeploymentAnalysis,
 )
+from src.models.competitor_analysis import (
+    CompetitorAnalysis,
+    CompetitorAnalysisMode,
+    CompetitorAnalysisStatus,
+    CompetitorAnalysisWinner,
+)
 
 __all__ = [
     "User",
@@ -28,4 +34,8 @@ __all__ = [
     "WebhookConfig",
     "WebhookEvent",
     "DeploymentAnalysis",
+    "CompetitorAnalysis",
+    "CompetitorAnalysisMode",
+    "CompetitorAnalysisStatus",
+    "CompetitorAnalysisWinner",
 ]

@@ -71,6 +71,9 @@ class SeoInsightService:
                 if response_times:
                     avg_response_time = mean(response_times)
                 
+                # Calculate simple pass/fail score
+                score = self._calculate_score(base_url_checks_dict, url_results_list)
+                
                 db_result = SeoInsightResult(
                     user_id=user_id,
                     target_url=target_url,
@@ -79,6 +82,7 @@ class SeoInsightService:
                     url_results=url_results_list,
                     total_pages=len(url_results_list),
                     avg_response_time_ms=avg_response_time,
+                    score=score
                 )
                 await self.repo.create(db_result)
             
@@ -143,13 +147,7 @@ class SeoInsightService:
                     message="Result not found",
                     data=None
                 )
-            deleted = await self.repo.delete(result_id)
-            if not deleted:
-                return create_response(
-                    status=RESPONSE_STATUS_ERROR,
-                    message="Failed to delete result",
-                    data=None
-                )
+            await self.repo.delete(result)
             return create_response(
                 status=RESPONSE_STATUS_SUCCESS,
                 message="Result deleted successfully",
@@ -192,23 +190,12 @@ class SeoInsightService:
                 elif status_value == AnalysisStatus.PENDING.value:
                     pending_count += 1
                 
-                if item.base_url_checks:
-                    checks = item.base_url_checks
-                    for key, value in checks.items():
-                        if isinstance(value, bool):
-                            if value:
-                                total_passed += 1
-                            else:
-                                total_warnings += 1
-                        elif isinstance(value, dict):
-                            if value.get('passed'):
-                                total_passed += 1
-                            elif value.get('severity') == 'critical':
-                                total_critical += 1
-                            else:
-                                total_warnings += 1
-                    
-                    score = self._calculate_score(checks)
+                # Use stored score if available
+                if hasattr(item, 'score') and item.score is not None:
+                    scores.append(item.score)
+                elif item.base_url_checks:
+                    # Calculate simple score from checks
+                    score = self._calculate_score(item.base_url_checks, item.url_results if hasattr(item, 'url_results') else [])
                     scores.append(score)
             
             avg_score = mean(scores) if scores else 0.0
@@ -234,9 +221,71 @@ class SeoInsightService:
                 data=None
             )
     
-    def _calculate_score(self, checks: dict) -> float:
-        if not checks:
-            return 0.0
-        total = len(checks)
-        passed = sum(1 for k, v in checks.items() if v == True or (isinstance(v, dict) and v.get('passed')))
-        return (passed / total * 100) if total else 0.0
+    def _calculate_score(self, base_url_checks: dict, url_results: list) -> int:
+        """Calculate simple pass/fail score: PASS=100%, WARNING=50%, FAIL=0%"""
+        total_checks = 0
+        passed_checks = 0
+        warning_checks = 0
+        failed_checks = 0
+        
+        # Count base URL checks
+        base_checks = [
+            base_url_checks.get('www_redirect_check'),
+            base_url_checks.get('robots_txt_check'),
+            base_url_checks.get('https_ssl_check'),
+            base_url_checks.get('directory_listing_check'),
+            base_url_checks.get('expires_headers_check'),
+            base_url_checks.get('caching_advice'),
+        ]
+        
+        for check in base_checks:
+            if check:
+                status = check.get('status', '')
+                total_checks += 1
+                if status == 'PASS':
+                    passed_checks += 1
+                elif status == 'WARNING':
+                    warning_checks += 1
+                elif status == 'FAIL':
+                    failed_checks += 1
+        
+        # Count URL result checks
+        for result in url_results:
+            if not isinstance(result, dict):
+                continue
+            checks = [
+                result.get('title_length_check'),
+                result.get('title_keyword_presence'),
+                result.get('meta_description_length_check'),
+                result.get('meta_description_keyword_presence'),
+                result.get('h1_check'),
+                result.get('image_alt_check'),
+                result.get('canonical_check'),
+                result.get('noindex_check'),
+                result.get('open_graph_check'),
+                result.get('schema_validation'),
+                result.get('html_size_check'),
+                result.get('response_time_check'),
+                result.get('js_minification_check'),
+                result.get('css_minification_check'),
+                result.get('mobile_responsiveness'),
+            ]
+            
+            for check in checks:
+                if check:
+                    status = check.get('status', '')
+                    total_checks += 1
+                    if status == 'PASS':
+                        passed_checks += 1
+                    elif status == 'WARNING':
+                        warning_checks += 1
+                    elif status == 'FAIL':
+                        failed_checks += 1
+        
+        # Calculate score: PASS = 100%, WARNING = 50%, FAIL = 0%
+        if total_checks > 0:
+            score = round(((passed_checks * 100 + warning_checks * 50) / total_checks))
+        else:
+            score = 0
+        
+        return score

@@ -58,9 +58,11 @@ class AnalyzeSiteSeoResult(BaseModel):
     h1_check: Optional[CheckResult] = None
     h1_keyword_guidance: Optional[str] = ""
     h1: Optional[str] = ""
+    
     h2_count: Optional[int] = 0
     h2_optimization_guidance: Optional[str] = ""
     h2: Optional[str] = ""
+    
     h3: Optional[str] = ""
     
     image_alt_check: Optional[CheckResult] = None
@@ -71,32 +73,39 @@ class AnalyzeSiteSeoResult(BaseModel):
     
     canonical_check: Optional[CheckResult] = None
     canonical: Optional[str] = ""
+    
     noindex_check: Optional[CheckResult] = None
     open_graph_check: Optional[CheckResult] = None
     schema_validation: Optional[CheckResult] = None
     
     html_size_check: Optional[CheckResult] = None
     html_size_bytes: Optional[int] = 0
+    
     response_time_check: Optional[CheckResult] = None
     response_time_ms: Optional[float] = 0.0
+    
     js_minification_check: Optional[CheckResult] = None
     css_minification_check: Optional[CheckResult] = None
+    
     total_js_files: Optional[int] = 0
     total_css_files: Optional[int] = 0
     total_requests: Optional[int] = 0
+    
     image_requests: Optional[int] = 0
     js_requests: Optional[int] = 0
     css_requests: Optional[int] = 0
+    
     requests_guidance: Optional[str] = ""
     inline_css_warning: Optional[str] = ""
+    
     embedded_objects_check: Optional[CheckResult] = None
     
     mobile_responsiveness: Optional[CheckResult] = None
     
-    lcp: Optional[str] = "-"
-    fid: Optional[str] = "-"
-    cls: Optional[str] = "-"
-
+    lcp: Optional[str] = ""
+    fid: Optional[str] = ""
+    cls: Optional[str] = ""
+    
     class Config:
         populate_by_name = True
 

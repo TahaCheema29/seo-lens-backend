@@ -25,6 +25,7 @@ class User(Base, BaseModel):
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     webhook_configs = relationship("WebhookConfig", back_populates="user", cascade="all, delete-orphan")
     deployment_analyses = relationship("DeploymentAnalysis", back_populates="user", cascade="all, delete-orphan")
+    competitor_analyses = relationship("CompetitorAnalysis", back_populates="user")
 
     def __repr__(self):
         return f"<User {self.email}>"
