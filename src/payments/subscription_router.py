@@ -39,6 +39,47 @@ async def get_subscription(
     )
 
 
+@router.post("/subscription/upgrade-manual")
+async def manual_upgrade_to_pro(
+    current_user: User = Depends(get_current_user),
+    service: SubscriptionService = Depends(get_subscription_service),
+):
+    """
+    MANUAL UPGRADE - For testing only!
+    Manually upgrade user to Pro without payment.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        logger.info(f"[MANUAL UPGRADE] Upgrading user {current_user.id} to Pro")
+        
+        # Create a mock session data
+        mock_session = {
+            "metadata": {
+                "user_id": str(current_user.id),
+                "tier": "pro"
+            },
+            "customer": f"cus_manual_{current_user.id}"
+        }
+        
+        result = await service.handle_checkout_completed(mock_session)
+        
+        logger.info(f"[MANUAL UPGRADE] User upgraded successfully")
+        
+        return create_response(
+            True,
+            "Manually upgraded to Pro",
+            {"tier": "pro", "is_pro": True}
+        )
+    except Exception as e:
+        logger.error(f"[MANUAL UPGRADE] Error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Upgrade failed: {str(e)}"
+        )
+
+
 @router.post("/subscription/checkout")
 async def create_checkout_session(
     current_user: User = Depends(get_current_user),
@@ -49,21 +90,31 @@ async def create_checkout_session(
     
     Returns checkout URL to redirect user to Stripe payment page
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"[CHECKOUT] User {current_user.id} ({current_user.email}) requesting checkout")
+        
         # Check if user already has Pro
         subscription = await service.get_subscription(current_user.id)
         if subscription.is_pro:
+            logger.info(f"[CHECKOUT] User {current_user.id} already has Pro")
             return create_response(
                 False,
                 "You already have a Pro subscription",
                 {"tier": "pro"}
             )
         
+        logger.info(f"[CHECKOUT] Creating checkout session for user {current_user.id}")
+        
         # Create checkout session
         checkout_data = await service.create_checkout_session(
             user_id=current_user.id,
             user_email=current_user.email,
         )
+        
+        logger.info(f"[CHECKOUT] Checkout session created: {checkout_data.get('session_id')}")
         
         return create_response(
             True,
@@ -72,6 +123,8 @@ async def create_checkout_session(
         )
         
     except Exception as e:
+        logger.error(f"[CHECKOUT] Error creating checkout: {str(e)}")
+        logger.exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create checkout session: {str(e)}"

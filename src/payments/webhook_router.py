@@ -15,6 +15,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Webhooks"])
 
 
+@router.get("/api/webhooks/stripe/test")
+async def test_webhook_endpoint():
+    """Test endpoint to verify webhook route is accessible"""
+    logger.info("[WEBHOOK TEST] Webhook test endpoint called")
+    return {"status": "ok", "message": "Webhook endpoint is accessible"}
+
+
 @router.post("/api/webhooks/stripe")
 async def stripe_webhook(
     request: Request,
@@ -30,33 +37,60 @@ async def stripe_webhook(
     
     The webhook must be configured in Stripe Dashboard with the webhook secret.
     """
-    payload = await request.body()
+    logger.info("=" * 80)
+    logger.info("[WEBHOOK] Received webhook request")
+    logger.info(f"[WEBHOOK] URL: {request.url}")
+    logger.info(f"[WEBHOOK] Method: {request.method}")
     
-    # Verify webhook signature
-    if not stripe_signature:
-        logger.error("Missing Stripe signature header")
+    # Get all headers
+    headers_dict = dict(request.headers)
+    logger.info(f"[WEBHOOK] All headers: {headers_dict}")
+    
+    payload = await request.body()
+    logger.info(f"[WEBHOOK] Payload size: {len(payload)} bytes")
+    logger.info(f"[WEBHOOK] Payload preview: {payload[:200]}...")
+    
+    # Check for stripe-signature header (case insensitive)
+    stripe_sig_header = None
+    for key, value in headers_dict.items():
+        if key.lower() == "stripe-signature":
+            stripe_sig_header = value
+            logger.info(f"[WEBHOOK] Found stripe-signature header (key: {key}): {value[:30]}...")
+            break
+    
+    if not stripe_sig_header and not stripe_signature:
+        logger.error("[WEBHOOK] Missing Stripe signature header")
+        logger.error(f"[WEBHOOK] Available headers: {list(headers_dict.keys())}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing Stripe signature"
         )
     
+    # Use whichever signature we found
+    sig_to_use = stripe_signature or stripe_sig_header
+    logger.info(f"[WEBHOOK] Using signature: {sig_to_use[:30]}...")
+    
     try:
         # Verify and construct event
+        logger.info("[WEBHOOK] Verifying webhook signature...")
         event = stripe_client.Webhook.construct_event(
             payload,
-            stripe_signature,
+            sig_to_use,
             settings.stripe_webhook_secret
         )
+        logger.info("[WEBHOOK] Signature verified successfully")
     except ValueError as e:
         # Invalid payload
-        logger.error(f"Invalid webhook payload: {e}")
+        logger.error(f"[WEBHOOK] Invalid webhook payload: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid webhook payload"
         )
     except stripe_client.error.SignatureVerificationError as e:
-        # Invalid signature
-        logger.error(f"Invalid webhook signature: {e}")
+        # Invalid signature - reject the webhook
+        logger.error(f"[WEBHOOK] Invalid webhook signature: {e}")
+        logger.error(f"[WEBHOOK] Signature used: {sig_to_use[:50]}...")
+        logger.error(f"[WEBHOOK] Secret configured: {settings.stripe_webhook_secret[:20]}... (length: {len(settings.stripe_webhook_secret)})")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid webhook signature"
@@ -109,20 +143,30 @@ async def stripe_webhook(
 async def handle_checkout_completed(service: SubscriptionService, session: dict):
     """Handle successful checkout completion"""
     try:
+        logger.info(f"[WEBHOOK] Processing checkout.session.completed")
+        logger.info(f"[WEBHOOK] Session ID: {session.get('id')}")
+        logger.info(f"[WEBHOOK] Session data: {session}")
+        
         metadata = session.get("metadata", {})
         user_id = metadata.get("user_id")
         tier = metadata.get("tier")
         
+        logger.info(f"[WEBHOOK] Metadata: user_id={user_id}, tier={tier}")
+        
         if not user_id:
-            logger.error("No user_id in checkout session metadata")
+            logger.error("[WEBHOOK] No user_id in checkout session metadata")
             return
         
         if tier == "pro":
-            await service.handle_checkout_completed(session)
-            logger.info(f"User {user_id} upgraded to Pro via checkout")
+            logger.info(f"[WEBHOOK] Upgrading user {user_id} to Pro...")
+            result = await service.handle_checkout_completed(session)
+            logger.info(f"[WEBHOOK] User {user_id} upgraded to Pro successfully: {result}")
+        else:
+            logger.warning(f"[WEBHOOK] Unknown tier '{tier}', skipping upgrade")
         
     except Exception as e:
-        logger.error(f"Error handling checkout completion: {e}")
+        logger.error(f"[WEBHOOK] Error handling checkout completion: {e}")
+        logger.exception(e)
         raise
 
 

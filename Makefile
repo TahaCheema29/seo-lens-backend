@@ -22,7 +22,9 @@ help:
 	@echo "    make docker-migrate-init   - Initialize from scratch"
 	@echo "    make docker-db-tables      - List database tables"
 	@echo "    make docker-db-shell       - Open database shell"
-	@echo "    make docker-db-reset        - Reset database"
+	@echo "    make docker-db-reset       - Reset database"
+	@echo "    make docker-log-users      - Log all users in database"
+	@echo "    make docker-log-subs       - Log all subscriptions in database"
 	@echo ""
 	@echo "  Database (Local - without Docker):"
 	@echo "    make migrate        - Run migrations"
@@ -107,3 +109,11 @@ clean:
 	find . -type d -name "*.egg-info" -exec rm -rf {} +
 	rm -rf .pytest_cache
 	rm -rf .mypy_cache
+
+# Log users table
+docker-log-users:
+	docker compose exec app python scripts/log_users.py
+
+# Log subscriptions table
+docker-log-subs:
+	docker compose exec app python scripts/log_subscriptions.py

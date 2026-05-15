@@ -11,7 +11,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - .env.local
+      - .env.docker
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/seo_lens
       - REDIS_URL=redis://redis:6379
