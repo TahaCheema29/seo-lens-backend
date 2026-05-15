@@ -35,7 +35,8 @@ class SendGridProvider(EmailProvider):
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("SENDGRID_API_KEY")
-        logger.info("API KEY is ",self.api_key)
+        if self.api_key:
+            logger.info(f"SendGrid API key configured: {self.api_key[:10]}...")
         self.from_email = os.getenv("SENDGRID_FROM_EMAIL", "noreply@seo-lens.com")
         self.from_name = os.getenv("SENDGRID_FROM_NAME", "SEO Lens")
 
@@ -123,7 +124,7 @@ class EmailService:
     def _get_provider(self) -> EmailProvider:
         """Get the configured email provider"""
         provider_type = os.getenv("EMAIL_PROVIDER", "console").lower()
-        logger.info("EMAIL_PROVIDER ", provider_type)
+        logger.info(f"EMAIL_PROVIDER: {provider_type}")
 
         if provider_type == "sendgrid":
             return SendGridProvider()

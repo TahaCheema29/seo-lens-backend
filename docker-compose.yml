@@ -30,6 +30,29 @@ services:
       retries: 3
       start_period: 40s
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: seo-lens-worker
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/seo_lens
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/app
+    networks:
+      - seo_net
+    command: >
+      sh -c "sleep 10 && python worker.py"
+
   redis:
     image: redis:7-alpine
     container_name: seo-lens-redis

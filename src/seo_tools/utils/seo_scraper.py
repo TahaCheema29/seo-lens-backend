@@ -17,7 +17,7 @@ logger = setup_logger(__name__)
 
 
 class SEOScraper:
-    def __init__(self, start_url: str, max_workers: int = 5):
+    def __init__(self, start_url: str, max_workers: int = 15):
         self.start_url = start_url
         self.max_workers = max_workers
         self.results = []
@@ -688,7 +688,7 @@ class SEOScraper:
                 "requests_guidance": "⚠️ Could not count requests"
             }
 
-    async def scrape_worker(self, browser, worker_id, queue: asyncio.Queue):
+    async def scrape_worker(self, browser, worker_id, queue: asyncio.Queue, core_web_vitals_task=None):
         page = await browser.new_page()
         while True:
             try:
@@ -734,11 +734,30 @@ class SEOScraper:
                 requests_data = await self.count_requests(page)
                 data.update(requests_data)
                 
-                if self.google_cloud_api_key_3:
-                    print("checking web vitals")
-                    vitals = await self.check_core_web_vitals(url)
-                    print("vitals are ", vitals)
-                    data.update(vitals)
+                # Only check Core Web Vitals for base URL (homepage) to improve performance
+                # Internal pages get placeholder values as they typically have similar performance
+                parsed_url = urlparse(url)
+                base_parsed = urlparse(str(self.start_url))
+                is_base_url = (parsed_url.netloc == base_parsed.netloc and 
+                               parsed_url.path.rstrip('/') == base_parsed.path.rstrip('/'))
+                
+                if self.google_cloud_api_key_3 and is_base_url and core_web_vitals_task:
+                    print(f"📊 Awaiting Core Web Vitals for base URL: {url}")
+                    try:
+                        # Wait for the parallel API call to complete (or timeout)
+                        vitals = await asyncio.wait_for(core_web_vitals_task, timeout=35.0)
+                        print(f"✅ Core Web Vitals received: {vitals}")
+                        data.update(vitals)
+                    except asyncio.TimeoutError:
+                        print(f"⚠️ Core Web Vitals API timeout for {url}")
+                        data.update({"lcp": "-", "fid": "-", "cls": "-"})
+                    except Exception as e:
+                        print(f"⚠️ Core Web Vitals API error for {url}: {e}")
+                        data.update({"lcp": "-", "fid": "-", "cls": "-"})
+                else:
+                    # Skip Core Web Vitals for internal pages - use placeholder values
+                    # This significantly improves performance while maintaining data structure
+                    data.update({"lcp": "-", "fid": "-", "cls": "-"})
 
                 async with self.lock:
                     self.results.append(data)
@@ -754,8 +773,19 @@ class SEOScraper:
         print(f"✅ Worker {worker_id} finished")
 
     async def run(self, urls):
-        """Run scraping process for all URLs"""
+        """Run scraping process for all URLs with parallel Core Web Vitals fetching"""
         self.base_url_checks = await self.check_base_url(self.start_url)
+        
+        # Start Core Web Vitals API call in parallel (non-blocking)
+        # This fetches performance metrics while scraping happens concurrently
+        core_web_vitals_task = None
+        base_url_str = str(self.start_url).rstrip('/')
+        
+        if self.google_cloud_api_key_3:
+            print(f"🚀 Starting parallel Core Web Vitals fetch for base URL: {base_url_str}")
+            core_web_vitals_task = asyncio.create_task(
+                self.check_core_web_vitals(base_url_str)
+            )
         
         queue = asyncio.Queue()
         for url in urls:
@@ -764,7 +794,8 @@ class SEOScraper:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             tasks = [
-                self.scrape_worker(browser, i, queue) for i in range(self.max_workers)
+                self.scrape_worker(browser, i, queue, core_web_vitals_task) 
+                for i in range(self.max_workers)
             ]
             await asyncio.gather(*tasks)
             await browser.close()

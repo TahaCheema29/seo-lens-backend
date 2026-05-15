@@ -116,7 +116,7 @@ async def github_webhook(
 
 
 @router.post("/trigger", response_model=TriggerAnalysisResponse)
-@limiter.limit("30/minute")  # IP-based: 30 requests per minute per IP
+@limiter.limit("1/minute")  # IP-based: 30 requests per minute per IP
 async def trigger_analysis(
     request: Request,  # Must be named 'request' for slowapi - Starlette Request
     analysis_data: TriggerAnalysisRequest,  # Renamed to avoid conflict with 'request'
